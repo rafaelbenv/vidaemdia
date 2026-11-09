@@ -1,0 +1,173 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  PROFESSIONAL
+  SECRETARY
+  ADMIN
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  TELEGRAM
+  BOTH
+}
+
+enum CalendarType {
+  PERSONAL
+  PROFESSIONAL
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model User {
+  id               String              @id @default(uuid())
+  name             String
+  email            String              @unique
+  passwordHash     String              @map("password_hash")
+  phoneWhatsapp    String?             @map("phone_whatsapp")
+  telegramChatId   String?             @unique @map("telegram_chat_id")
+  role             UserRole            @default(USER)
+  preferredChannel NotificationChannel @default(TELEGRAM) @map("preferred_channel")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  ownedCalendars      Calendar[]           @relation("CalendarOwner")
+  delegatedCalendars  CalendarPermission[] @relation("GranteeUser")
+  createdAppointments Appointment[]        @relation("AppointmentCreator")
+  auditLogs           AuditLog[]           @relation("AuditActor")
+  telegramLinkTokens  TelegramLinkToken[]
+
+  @@map("users")
+}
+
+model Calendar {
+  id          String       @id @default(uuid())
+  ownerId     String       @map("owner_id")
+  type        CalendarType @default(PERSONAL)
+  name        String
+  description String?
+  color       String       @default("#4F46E5")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  owner        User                 @relation("CalendarOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  permissions  CalendarPermission[]
+  appointments Appointment[]
+  auditLogs    AuditLog[]
+
+  @@index([ownerId])
+  @@map("calendars")
+}
+
+model CalendarPermission {
+  id            String   @id @default(uuid())
+  calendarId    String   @map("calendar_id")
+  granteeUserId String   @map("grantee_user_id")
+  canView       Boolean  @default(true) @map("can_view")
+  canCreate     Boolean  @default(true) @map("can_create")
+  canUpdate     Boolean  @default(true) @map("can_update")
+  canCancel     Boolean  @default(true) @map("can_cancel")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  calendar    Calendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  granteeUser User     @relation("GranteeUser", fields: [granteeUserId], references: [id], onDelete: Cascade)
+
+  @@unique([calendarId, granteeUserId])
+  @@map("calendar_permissions")
+}
+
+model Appointment {
+  id                String            @id @default(uuid())
+  calendarId        String            @map("calendar_id")
+  createdById       String            @map("created_by_id")
+  title             String
+  description       String?
+  startTime         DateTime          @map("start_time")
+  endTime           DateTime          @map("end_time")
+  reminderMinutesBefore Int           @default(30) @map("reminder_minutes_before")
+  status            AppointmentStatus @default(SCHEDULED)
+  createdVia        String            @default("WEB") @map("created_via") // WEB, WHATSAPP, TELEGRAM
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  calendar  Calendar   @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  createdBy User       @relation("AppointmentCreator", fields: [createdById], references: [id])
+  reminders Reminder[]
+
+  @@index([calendarId, startTime, endTime])
+  @@map("appointments")
+}
+
+model Reminder {
+  id            String              @id @default(uuid())
+  appointmentId String              @map("appointment_id")
+  remindAt      DateTime            @map("remind_at")
+  channel       NotificationChannel @default(TELEGRAM)
+  status        ReminderStatus      @default(PENDING)
+  retryCount    Int                 @default(0) @map("retry_count")
+  nextRetryAt   DateTime?           @map("next_retry_at")
+  lastError     String?             @map("last_error")
+  sentAt        DateTime?           @map("sent_at")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([status, remindAt])
+  @@map("reminders")
+}
+
+model AuditLog {
+  id               String   @id @default(uuid())
+  actorUserId      String?  @map("actor_user_id")
+  targetCalendarId String?  @map("target_calendar_id")
+  entityType       String   @map("entity_type") // APPOINTMENT, PERMISSION, AUTH, RBAC
+  entityId         String?  @map("entity_id")
+  action           String   // CREATE, UPDATE, CANCEL, ACCESS_DENIED, LOGIN
+  details          String?
+  metadata         Json?
+  ipAddress        String?  @map("ip_address")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  actorUser      User?     @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  targetCalendar Calendar? @relation(fields: [targetCalendarId], references: [id], onDelete: SetNull)
+
+  @@index([targetCalendarId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@map("audit_logs")
+}
+
+model TelegramLinkToken {
+  id        String    @id @default(uuid())
+  code      String    @unique
+  userId    String    @map("user_id")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("telegram_link_tokens")
+}
+
+

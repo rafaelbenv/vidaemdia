@@ -1,0 +1,133 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vidaemdia-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vidaemdia}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vidaemdia_secret_pwd}
+      POSTGRES_DB: ${POSTGRES_DB:-vidaemdia_db}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/backup/backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vidaemdia} -d ${POSTGRES_DB:-vidaemdia_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vidaemdia-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vidaemdia-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vidaemdia}:${POSTGRES_PASSWORD:-vidaemdia_secret_pwd}@postgres:5432/${POSTGRES_DB:-vidaemdia_db}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-vidaemdia_jwt_super_secret_key_2026}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      TZ: America/Sao_Paulo
+      APP_TIMEZONE: ${APP_TIMEZONE:-America/Sao_Paulo}
+      WORKER_CRON_EXPRESSION: ${WORKER_CRON_EXPRESSION:-*/5 * * * *}
+      MAX_REMINDER_RETRIES: ${MAX_REMINDER_RETRIES:-3}
+      WHATSAPP_ENABLED: ${WHATSAPP_ENABLED:-false}
+      WHATSAPP_MOCK_MODE: ${WHATSAPP_MOCK_MODE:-true}
+      WHATSAPP_API_URL: ${WHATSAPP_API_URL:-https://graph.facebook.com/v20.0}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-000000000000}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-mock_token}
+      TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-true}
+      TELEGRAM_MODE: ${TELEGRAM_MODE:-mock}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-mock_token}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+      TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+    ports:
+      - "3000:3000"
+    networks:
+      - vidaemdia-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: vidaemdia-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - vidaemdia-net
+
+  pg-backup:
+    image: postgres:16-alpine
+    container_name: vidaemdia-backup
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-vidaemdia}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-vidaemdia_secret_pwd}
+      PGDATABASE: ${POSTGRES_DB:-vidaemdia_db}
+      BACKUP_RETENTION_DAYS: 7
+    volumes:
+      - ./infra/backup:/scripts:ro
+      - ./infra/backup/backups:/backups
+    entrypoint: ["/bin/sh", "-c", "echo '0 2 * * * /scripts/backup.sh >> /var/log/backup.log 2>&1' | crontab - && crond -f -l 2"]
+    networks:
+      - vidaemdia-net
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: vidaemdia-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./infra/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - vidaemdia-net
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: vidaemdia-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-vidaemdia_admin}
+    volumes:
+      - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    networks:
+      - vidaemdia-net
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  vidaemdia-net:
+    driver: bridge
+

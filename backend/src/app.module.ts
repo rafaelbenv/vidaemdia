@@ -1,0 +1,28 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
+import { PrismaModule } from './prisma/prisma.module';
+import { AuditModule } from './audit/audit.module';
+import { MonitoringModule } from './monitoring/monitoring.module';
+import { AuthModule } from './auth/auth.module';
+import { CalendarsModule } from './calendars/calendars.module';
+import { AppointmentsModule } from './appointments/appointments.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { TelegramModule } from './telegram/telegram.module';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
+    PrismaModule,
+    AuditModule,
+    MonitoringModule,
+    AuthModule,
+    CalendarsModule,
+    AppointmentsModule,
+    NotificationsModule,
+    TelegramModule,
+  ],
+})
+export class AppModule {}
+

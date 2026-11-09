@@ -1,0 +1,17 @@
+node_modules/
+dist/
+build/
+.env
+*.log
+coverage/
+.DS_Store
+infra/backup/backups/*
+!infra/backup/backups/.gitkeep
+infra/postgres-data/
+infra/grafana-data/
+infra/prometheus-data/
+backend/prisma/*.db
+backend/prisma/*.db-journal
+
+.claude/settings.local.json
+graphify-out/
