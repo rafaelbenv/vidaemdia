@@ -16,7 +16,7 @@ export class AuthController {
   }
 
   @Post('register')
-  @ApiOperation({ summary: 'Cadastra novo Usuário, Profissional ou Secretária e cria suas agendas padrão' })
+  @ApiOperation({ summary: 'Cadastra novo usuário (papel USER) e cria sua agenda pessoal' })
   async register(@Body() dto: RegisterDto, @Req() req: any) {
     return this.authService.register(dto, req.ip);
   }

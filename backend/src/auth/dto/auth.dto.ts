@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
-import { NotificationChannel, UserRole } from '@prisma/client';
+import { NotificationChannel } from '@prisma/client';
 
 export class LoginDto {
   @ApiProperty({ example: 'dr.joao@vidaemdia.com.br' })
@@ -27,11 +27,6 @@ export class RegisterDto {
   @IsString()
   @MinLength(6, { message: 'A senha deve ter no mínimo 6 caracteres' })
   password: string;
-
-  @ApiPropertyOptional({ enum: UserRole, default: UserRole.USER })
-  @IsOptional()
-  @IsEnum(UserRole)
-  role?: UserRole;
 
   @ApiPropertyOptional({ example: '5511999991111' })
   @IsOptional()

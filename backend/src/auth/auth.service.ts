@@ -72,7 +72,7 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    const role = dto.role || UserRole.USER;
+    const role = UserRole.USER;
 
     const user = await this.prisma.user.create({
       data: {
@@ -85,7 +85,7 @@ export class AuthService {
       },
     });
 
-    // Cria automaticamente Agenda Pessoal para qualquer usuário e Agenda Profissional se for PROFESSIONAL
+    // Cria automaticamente a Agenda Pessoal do novo usuário
     await this.prisma.calendar.create({
       data: {
         ownerId: user.id,
@@ -95,18 +95,6 @@ export class AuthService {
         color: '#2563EB',
       },
     });
-
-    if (role === UserRole.PROFESSIONAL) {
-      await this.prisma.calendar.create({
-        data: {
-          ownerId: user.id,
-          type: CalendarType.PROFESSIONAL,
-          name: `Agenda Profissional - ${user.name}`,
-          description: 'Atendimentos e compromissos profissionais',
-          color: '#16A34A',
-        },
-      });
-    }
 
     await this.auditService.log({
       actorUserId: user.id,
