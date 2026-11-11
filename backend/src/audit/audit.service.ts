@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface CreateAuditLogInput {
@@ -35,6 +35,21 @@ export class AuditService {
     const where: any = {};
 
     if (calendarId) {
+      if (role !== 'ADMIN') {
+        const calendar = await this.prisma.calendar.findUnique({
+          where: { id: calendarId },
+          select: {
+            ownerId: true,
+            permissions: { where: { granteeUserId: userId, canView: true }, select: { id: true } },
+          },
+        });
+        if (!calendar) {
+          throw new NotFoundException('Agenda não encontrada');
+        }
+        if (calendar.ownerId !== userId && calendar.permissions.length === 0) {
+          throw new ForbiddenException('Você não tem acesso ao histórico desta agenda');
+        }
+      }
       where.targetCalendarId = calendarId;
     } else if (role !== 'ADMIN') {
       where.OR = [
