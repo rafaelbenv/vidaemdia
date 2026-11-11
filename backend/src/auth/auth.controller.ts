@@ -28,11 +28,5 @@ export class AuthController {
   async me(@Req() req: any) {
     return this.authService.getProfile(req.user.sub);
   }
-
-  @Get('demo-accounts')
-  @ApiOperation({ summary: 'Lista contas de demonstração para facilitar o teste dos 3 fluxos (Usuário, Profissional, Secretária)' })
-  async demoAccounts() {
-    return this.authService.listDemoAccounts();
-  }
 }
 

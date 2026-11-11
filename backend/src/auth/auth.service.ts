@@ -133,20 +133,5 @@ export class AuthService {
       telegramLinked: Boolean(telegramChatId),
     };
   }
-
-  async listDemoAccounts() {
-    return this.prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        phoneWhatsapp: true,
-        telegramChatId: true,
-        preferredChannel: true,
-      },
-      orderBy: { name: 'asc' },
-    });
-  }
 }
 
