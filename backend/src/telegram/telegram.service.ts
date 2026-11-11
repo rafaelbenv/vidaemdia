@@ -145,7 +145,9 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       } catch {
         try {
           description = await response.text();
-        } catch {}
+        } catch {
+          // corpo ilegível: mantém a descrição padrão
+        }
       }
       const safeDesc = maskTelegramToken(description);
       const errorMsg = `Telegram API HTTP ${response.status}: ${safeDesc}`;
