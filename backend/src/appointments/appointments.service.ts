@@ -32,6 +32,10 @@ export class AppointmentsService {
     });
   }
 
+  private computeRemindAt(startTime: Date, minutesBefore: number): Date {
+    return new Date(startTime.getTime() - minutesBefore * 60 * 1000);
+  }
+
   /**
    * Implementa exatamente as etapas 5, 6 e 7 do Fluxo Principal e a Dupla Checagem do Fluxo RBAC:
    * - NestJS valida autenticação + RBAC + dados do compromisso
@@ -90,33 +94,34 @@ export class AppointmentsService {
     }
 
     const reminderMinutesBefore = dto.reminderMinutesBefore ?? 30;
-    // Se reminderMinutesBefore === 0, agenda o remindAt para 5 segundos atrás para que o Worker dispare no próximo ciclo imediatamente!
-    const remindAt =
-      reminderMinutesBefore === 0
-        ? new Date(Date.now() - 5000)
-        : new Date(startTime.getTime() - reminderMinutesBefore * 60 * 1000);
+    const remindAt = this.computeRemindAt(startTime, reminderMinutesBefore);
 
     const channel = dto.reminderChannel || NotificationChannel.WHATSAPP;
 
-    const appointment = await this.prisma.appointment.create({
-      data: {
-        calendarId: dto.calendarId,
-        createdById: userId,
-        title: dto.title.trim(),
-        description: dto.description?.trim() || null,
-        startTime,
-        endTime,
-        reminderMinutesBefore,
-        status: AppointmentStatus.SCHEDULED,
-        createdVia,
-        reminders: {
-          create: {
-            remindAt,
-            channel,
-            status: ReminderStatus.PENDING,
-          },
+    const data: any = {
+      calendarId: dto.calendarId,
+      createdById: userId,
+      title: dto.title.trim(),
+      description: dto.description?.trim() || null,
+      startTime,
+      endTime,
+      reminderMinutesBefore,
+      status: AppointmentStatus.SCHEDULED,
+      createdVia,
+    };
+
+    if (dto.reminderEnabled !== false) {
+      data.reminders = {
+        create: {
+          remindAt,
+          channel,
+          status: ReminderStatus.PENDING,
         },
-      },
+      };
+    }
+
+    const appointment = await this.prisma.appointment.create({
+      data,
       include: {
         createdBy: { select: { id: true, name: true, email: true, role: true } },
         reminders: true,
@@ -159,7 +164,7 @@ export class AppointmentsService {
   ) {
     const existing = await this.prisma.appointment.findUnique({
       where: { id: appointmentId },
-      include: { reminders: true },
+      include: { reminders: { orderBy: { createdAt: 'desc' } } },
     });
 
     if (!existing) {
@@ -176,10 +181,46 @@ export class AppointmentsService {
     );
 
     const startTime = dto.startTime ? new Date(dto.startTime) : existing.startTime;
-    const endTime = dto.endTime ? new Date(dto.endTime) : existing.endTime;
+    let endTime: Date;
+    if (dto.startTime && !dto.endTime) {
+      endTime = new Date(startTime.getTime() + (existing.endTime.getTime() - existing.startTime.getTime()));
+    } else if (dto.endTime) {
+      endTime = new Date(dto.endTime);
+    } else {
+      endTime = existing.endTime;
+    }
+
+    if (endTime <= startTime) {
+      throw new BadRequestException('O horário de término deve ser posterior ao horário de início');
+    }
+
+    const timeChanged =
+      startTime.getTime() !== existing.startTime.getTime() ||
+      endTime.getTime() !== existing.endTime.getTime();
+
+    if (operation === 'UPDATE' && calendar.type === CalendarType.PROFESSIONAL && timeChanged) {
+      const conflict = await this.prisma.appointment.findFirst({
+        where: {
+          calendarId: existing.calendarId,
+          id: { not: appointmentId },
+          status: AppointmentStatus.SCHEDULED,
+          AND: [
+            { startTime: { lt: endTime } },
+            { endTime: { gt: startTime } },
+          ],
+        },
+      });
+
+      if (conflict) {
+        throw new BadRequestException(
+          `Conflito de horário: Já existe o compromisso "${conflict.title}" agendado neste período na agenda profissional.`,
+        );
+      }
+    }
+
     const reminderMinutesBefore = dto.reminderMinutesBefore ?? existing.reminderMinutesBefore;
 
-    const updated = await this.prisma.appointment.update({
+    await this.prisma.appointment.update({
       where: { id: appointmentId },
       data: {
         title: dto.title ?? existing.title,
@@ -189,27 +230,76 @@ export class AppointmentsService {
         reminderMinutesBefore,
         status: dto.status ?? existing.status,
       },
-      include: {
-        createdBy: { select: { id: true, name: true, email: true, role: true } },
-        reminders: true,
-      },
     });
 
-    // Se o horário ou canal de lembrete mudou e o lembrete ainda estava PENDING, atualiza o lembrete
-    if (dto.startTime || dto.reminderMinutesBefore !== undefined || dto.reminderChannel) {
-      const remindAt =
-        reminderMinutesBefore === 0
-          ? new Date(Date.now() - 5000)
-          : new Date(startTime.getTime() - reminderMinutesBefore * 60 * 1000);
+    if (operation === 'UPDATE') {
+      const existingReminders = existing.reminders ?? [];
+      const enabled =
+        dto.reminderEnabled ??
+        existingReminders.some(
+          (r) =>
+            r.status === ReminderStatus.PENDING ||
+            r.status === ReminderStatus.SENT ||
+            r.status === ReminderStatus.FAILED,
+        );
 
-      await this.prisma.reminder.updateMany({
-        where: { appointmentId, status: ReminderStatus.PENDING },
-        data: {
-          remindAt,
-          ...(dto.reminderChannel ? { channel: dto.reminderChannel } : {}),
-        },
-      });
+      const minutesChanged =
+        dto.reminderMinutesBefore !== undefined &&
+        dto.reminderMinutesBefore !== existing.reminderMinutesBefore;
+
+      if (enabled === false) {
+        await this.prisma.reminder.deleteMany({
+          where: { appointmentId, status: ReminderStatus.PENDING },
+        });
+      } else if (
+        enabled === true &&
+        (timeChanged ||
+          minutesChanged ||
+          dto.reminderEnabled === true ||
+          dto.reminderChannel)
+      ) {
+        const remindAt = this.computeRemindAt(startTime, reminderMinutesBefore);
+        const hasPending = existingReminders.some((r) => r.status === ReminderStatus.PENDING);
+
+        if (hasPending) {
+          await this.prisma.reminder.updateMany({
+            where: { appointmentId, status: ReminderStatus.PENDING },
+            data: {
+              remindAt,
+              ...(dto.reminderChannel ? { channel: dto.reminderChannel } : {}),
+            },
+          });
+        } else {
+          const alreadyExists = existingReminders.some(
+            (r) => r.remindAt && new Date(r.remindAt).getTime() === remindAt.getTime(),
+          );
+
+          if (remindAt > new Date() && !alreadyExists) {
+            const channel =
+              dto.reminderChannel ??
+              existingReminders[0]?.channel ??
+              NotificationChannel.TELEGRAM;
+
+            await this.prisma.reminder.create({
+              data: {
+                appointmentId,
+                remindAt,
+                channel,
+                status: ReminderStatus.PENDING,
+              },
+            });
+          }
+        }
+      }
     }
+
+    const updated = await this.prisma.appointment.findUnique({
+      where: { id: appointmentId },
+      include: {
+        createdBy: { select: { id: true, name: true, email: true, role: true } },
+        reminders: { orderBy: { createdAt: 'desc' } },
+      },
+    });
 
     await this.auditService.log({
       actorUserId: userId,
@@ -224,11 +314,13 @@ export class AppointmentsService {
         before: {
           title: existing.title,
           startTime: existing.startTime,
+          endTime: existing.endTime,
           status: existing.status,
         },
         after: {
           title: updated.title,
           startTime: updated.startTime,
+          endTime: updated.endTime,
           status: updated.status,
         },
         isDelegated,

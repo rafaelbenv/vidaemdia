@@ -1,6 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AppointmentStatus, NotificationChannel } from '@prisma/client';
-import { IsDateString, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class CreateAppointmentDto {
   @ApiProperty({ description: 'ID da Agenda (Pessoal ou Profissional)' })
@@ -26,7 +37,16 @@ export class CreateAppointmentDto {
   @IsDateString({}, { message: 'Informe uma data/hora de término válida (ISO 8601)' })
   endTime?: string;
 
-  @ApiPropertyOptional({ example: 30, default: 30, description: 'Minutos de antecedência para disparo do lembrete (0 = disparo imediato para teste)' })
+  @ApiPropertyOptional({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  reminderEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    example: 30,
+    default: 30,
+    description: 'Minutos de antecedência do lembrete (0 = na hora do compromisso; máx. 10080 = 7 dias)',
+  })
   @IsOptional()
   @IsInt()
   @Min(0)
@@ -60,10 +80,18 @@ export class UpdateAppointmentDto {
   @IsDateString()
   endTime?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  reminderEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Minutos de antecedência do lembrete (0 = na hora do compromisso; máx. 10080 = 7 dias)',
+  })
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(10080)
   reminderMinutesBefore?: number;
 
   @ApiPropertyOptional({ enum: AppointmentStatus })
