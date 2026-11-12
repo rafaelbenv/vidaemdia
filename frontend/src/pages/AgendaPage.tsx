@@ -43,6 +43,7 @@ export interface AgendaPageProps {
   loadingAppointments: boolean;
   appointments: Appointment[];
   openCancelDialog: (appt: Appointment) => void;
+  maxRetries?: number;
 }
 
 export function AgendaPage({
@@ -71,6 +72,7 @@ export function AgendaPage({
   loadingAppointments,
   appointments,
   openCancelDialog,
+  maxRetries = 3,
 }: AgendaPageProps) {
   return (
     <div role="tabpanel" id="tabpanel-agenda" aria-labelledby="tab-agenda">
@@ -385,8 +387,8 @@ export function AgendaPage({
                             {reminder.status === 'SENT'
                               ? 'ENVIADO ✅'
                               : reminder.status === 'FAILED'
-                              ? `FALHOU (${reminder.retryCount}/3) ❌`
-                              : `PENDENTE (Tentativas: ${reminder.retryCount}/3)`}
+                              ? `FALHOU (${reminder.retryCount}/${maxRetries}) ❌`
+                              : `PENDENTE (Tentativas: ${reminder.retryCount}/${maxRetries})`}
                           </span>
                         )}
                       </div>

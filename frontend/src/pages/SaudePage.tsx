@@ -1,6 +1,7 @@
 import React from 'react';
 import { Activity, Database, ShieldAlert, FileText } from 'lucide-react';
 import { HealthData } from '../types';
+import { API_BASE_URL } from '../api';
 
 export interface SaudePageProps {
   healthData: HealthData | null;
@@ -12,7 +13,7 @@ export function SaudePage({ healthData, auditLogsCount = 0 }: SaudePageProps) {
     <div className="space-y-6">
       <div className="flex justify-end">
         <a
-          href="http://localhost:3000/metrics"
+          href={`${API_BASE_URL}/metrics`}
           target="_blank"
           rel="noreferrer"
           className="px-3 py-1.5 rounded-md bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-mono"

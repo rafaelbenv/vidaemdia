@@ -36,7 +36,7 @@ export function LembretesPage({
                   <TechTag>Worker Telegram</TechTag>
                 </h2>
                 <p className="text-xs text-stone-500 mt-0.5">
-                  Consulta o PostgreSQL periodicamente, envia lembretes para Telegram e executa Retry de até 3 tentativas.
+                  Consulta o PostgreSQL periodicamente, envia lembretes para Telegram e executa Retry de até {workerStats?.maxRetries ?? 3} tentativas.
                 </p>
               </div>
 
@@ -46,7 +46,7 @@ export function LembretesPage({
                     onClick={handleSimulateFailure}
                     className="px-3 py-2 rounded-md border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold transition"
                   >
-                    Simular Erro na API (Testar Retry 3x)
+                    Simular Erro na API (Testar Retry {workerStats?.maxRetries ?? 3}x)
                   </button>
 
                   <button
@@ -89,6 +89,9 @@ export function LembretesPage({
             <h3 className="text-xs font-bold text-stone-700 uppercase tracking-wider mt-6 mb-3 flex items-center gap-1.5">
               Fila de Lembretes no PostgreSQL (Tabela <TechTag>reminders</TechTag>)
             </h3>
+            <p className="text-xs text-stone-500 mb-3">
+              Atualiza sozinho a cada 10 segundos.
+            </p>
 
             <div className="space-y-2.5">
               {remindersQueue.length === 0 ? (
@@ -111,7 +114,7 @@ export function LembretesPage({
                       </div>
                       <div className="text-stone-500 text-xs">
                         Agenda: {rem.appointment?.calendar?.name} · Canal: <b>{rem.channel === 'WHATSAPP' || rem.channel === 'BOTH' ? 'TELEGRAM' : rem.channel}</b> ·
-                        Tentativas: <b>{rem.retryCount}/3</b>
+                        Tentativas: <b>{rem.retryCount}/{workerStats?.maxRetries ?? 3}</b>
                       </div>
                       {rem.lastError && (
                         <div className="text-red-600 text-xs mt-1 font-medium">
@@ -132,7 +135,7 @@ export function LembretesPage({
                       {rem.status === 'SENT'
                         ? 'ENVIADO NO POSTGRESQL'
                         : rem.status === 'FAILED'
-                        ? 'FALHOU (MÁX 3 TENTATIVAS)'
+                        ? `FALHOU (MÁX ${workerStats?.maxRetries ?? 3} TENTATIVAS)`
                         : 'PENDENTE NA JANELA'}
                     </span>
                   </div>

@@ -67,6 +67,34 @@ import { AssistentePage } from './pages/AssistentePage';
 import { AuditoriaPage } from './pages/AuditoriaPage';
 import { SaudePage } from './pages/SaudePage';
 
+const CHAT_STORAGE_KEY = 'vidaemdia_chat';
+
+function createWelcomeMessage(): ChatMessage[] {
+  return [
+    {
+      sender: 'BOT',
+      text: '👋 Olá! Sou o assistente inteligente do <b>VidaEmDia</b>.\nEnvie <code>agenda</code> para ver seus compromissos ou escreva por exemplo:\n<b>"Marcar Reunião de Equipe amanhã às 14:30"</b> para agendar automaticamente!',
+      time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      channel: 'TELEGRAM',
+    },
+  ];
+}
+
+function getInitialChatHistory(): ChatMessage[] {
+  try {
+    const raw = sessionStorage.getItem(CHAT_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {
+    // se não houver ou falhar, usar a mensagem de boas-vindas de hoje
+  }
+  return createWelcomeMessage();
+}
+
 export function App() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -229,15 +257,16 @@ export function App() {
   const [secretaryEmailToGrant, setSecretaryEmailToGrant] = useState('secretaria.maria@vidaemdia.com.br');
 
   // Chatbot Interactive State
-  const [botInput, setBotInput] = useState('Marcar Consulta médica hoje às 08:00');
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
-    {
-      sender: 'BOT',
-      text: '👋 Olá! Sou o assistente inteligente do <b>VidaEmDia</b>.\nEnvie <code>agenda</code> para ver seus compromissos ou escreva por exemplo:\n<b>"Marcar Reunião de Equipe amanhã às 14:30"</b> para agendar automaticamente!',
-      time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-      channel: 'TELEGRAM',
-    },
-  ]);
+  const [botInput, setBotInput] = useState('');
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>(getInitialChatHistory);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chatHistory));
+    } catch {
+      // Ignora falhas de escrita no sessionStorage
+    }
+  }, [chatHistory]);
 
   useEffect(() => {
     if (token) {
@@ -256,6 +285,15 @@ export function App() {
       loadBastidoresData(token);
     }
   }, [user?.id, section, token]);
+
+  useEffect(() => {
+    if (section === 'lembretes' && token) {
+      const interval = window.setInterval(() => {
+        loadBastidoresData(token, { silent: true });
+      }, 10000);
+      return () => window.clearInterval(interval);
+    }
+  }, [section, token]);
 
   async function loadSession(jwt: string) {
     try {
@@ -302,7 +340,7 @@ export function App() {
     }
   }
 
-  async function loadBastidoresData(jwt: string) {
+  async function loadBastidoresData(jwt: string, options?: { silent?: boolean }) {
     try {
       const [profs, audits, notifStatus, health] = await Promise.all([
         getProfessionals(jwt),
@@ -318,6 +356,9 @@ export function App() {
       setDispatchedMessages(notifStatus.dispatchedMessages);
       setHealthData(health);
     } catch (err: unknown) {
+      if (options?.silent) {
+        return;
+      }
       const status = errorStatus(err);
       if (status !== 401) {
         setFeedbackBanner({
@@ -377,6 +418,12 @@ export function App() {
     setTelegramLinked(false);
     setTelegramWaiting(false);
     localStorage.removeItem('vidaemdia_jwt');
+    try {
+      sessionStorage.removeItem(CHAT_STORAGE_KEY);
+    } catch {
+      // Ignora erro ao acessar sessionStorage
+    }
+    setChatHistory(createWelcomeMessage());
     setToken(null);
     setUser(null);
     setInitialLoadError(null);
@@ -651,7 +698,7 @@ export function App() {
       setFeedbackBanner({
         type: 'error',
         title: 'Simulação de falha ativada! O próximo envio ao Telegram falhará.',
-        detail: 'Fila de Retry: máx. 3 tentativas no PostgreSQL',
+        detail: `Fila de Retry: máx. ${workerStats?.maxRetries ?? 3} tentativas no PostgreSQL`,
       });
       await loadBastidoresData(token);
       if (selectedCalendarId) {
@@ -920,6 +967,7 @@ export function App() {
             loadingAppointments={loadingAppointments}
             appointments={appointments}
             openCancelDialog={openCancelDialog}
+            maxRetries={workerStats?.maxRetries ?? 3}
           />
         )}
       </main>

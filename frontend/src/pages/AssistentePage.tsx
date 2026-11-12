@@ -116,7 +116,7 @@ export function AssistentePage({
             type="text"
             value={botInput}
             onChange={(e) => setBotInput(e.target.value)}
-            placeholder="Digite uma mensagem para o bot (ex.: Marcar Dentista amanhã às 10:00)..."
+            placeholder="Ex.: Marcar Consulta médica hoje às 08:00"
             className="flex-1 px-4 py-2.5 text-base border border-stone-300 rounded-md focus:ring-2 focus:ring-brand-700 focus:outline-none"
           />
           <button
