@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Appointment } from '../../types';
 import { formatLongDate, isSameDay } from '../../lib/dates';
 import { reminderLine } from '../../lib/reminderText';
+import { firstName } from '../../lib/format';
 import { AppointmentRow } from './AppointmentRow';
 
 export interface DayListProps {
@@ -93,7 +94,7 @@ export function DayList({
                 reminder={reminderLine(appt, { ownerTelegramLinked, isOwnCalendar })}
                 createdByOther={
                   appt.createdBy && appt.createdBy.id !== ownerId
-                    ? appt.createdBy.name.trim().split(/\s+/)[0]
+                    ? firstName(appt.createdBy.name)
                     : null
                 }
                 onConnectTelegram={onConnectTelegram}
@@ -151,7 +152,7 @@ export function DayList({
           const reminder = reminderLine(appt, { ownerTelegramLinked, isOwnCalendar });
           const createdByOther =
             appt.createdBy && appt.createdBy.id !== ownerId
-              ? appt.createdBy.name.trim().split(/\s+/)[0]
+              ? firstName(appt.createdBy.name)
               : null;
 
           return (

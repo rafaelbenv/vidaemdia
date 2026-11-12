@@ -1,3 +1,20 @@
+import { UserRole } from '../types';
+
+export function roleLabel(role?: UserRole | string): string {
+  if (role === 'PROFESSIONAL') return 'Profissional';
+  if (role === 'SECRETARY') return 'Secretária';
+  if (role === 'ADMIN') return 'Administrador';
+  return 'Usuário';
+}
+
+export function firstName(name?: string | null): string {
+  if (!name) return '';
+  const trimmed = name.trim();
+  const withoutTitle = trimmed.replace(/^(?:dr|dra|sr|sra)(?:\.|\b)\s*/i, '');
+  const first = withoutTitle.split(/\s+/)[0];
+  return first || trimmed.split(/\s+/)[0] || '';
+}
+
 export function sanitizeTelegramHtml(rawHtml: string): string {
   if (!rawHtml) return '';
   return rawHtml.replace(/<[^>]*>/g, (tag) => {

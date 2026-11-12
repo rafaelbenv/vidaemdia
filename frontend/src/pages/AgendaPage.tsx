@@ -19,9 +19,6 @@ import { DayList } from '../components/agenda/DayList';
 import { MonthGrid } from '../components/agenda/MonthGrid';
 
 export interface AgendaPageProps {
-  allAccessibleCalendars: Calendar[];
-  selectedCalendarId: string;
-  setSelectedCalendarId: (id: string) => void;
   user: User;
   activeCalendar?: Calendar;
   canCreate: boolean;
@@ -34,9 +31,6 @@ export interface AgendaPageProps {
 }
 
 export function AgendaPage({
-  allAccessibleCalendars,
-  selectedCalendarId,
-  setSelectedCalendarId,
   user,
   activeCalendar,
   canCreate,
@@ -129,15 +123,6 @@ export function AgendaPage({
     onNewAppointment(toDateKey(selectedDate));
   };
 
-  const ownedCalendars = useMemo(
-    () => allAccessibleCalendars.filter((c) => c.ownerId === user.id),
-    [allAccessibleCalendars, user.id],
-  );
-  const delegatedCalendars = useMemo(
-    () => allAccessibleCalendars.filter((c) => c.ownerId !== user.id),
-    [allAccessibleCalendars, user.id],
-  );
-
   const isOwnCalendar = activeCalendar ? activeCalendar.ownerId === user.id : true;
   const ownerTelegramLinked = isOwnCalendar
     ? Boolean(telegramLinked)
@@ -181,50 +166,8 @@ export function AgendaPage({
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
-      {/* 1. Seletor de agenda */}
-      <div className="flex items-center gap-3 min-w-0">
-        <label
-          htmlFor="calendar-select"
-          className="text-sm font-medium text-stone-700 shrink-0"
-        >
-          Agenda
-        </label>
-        <div className="flex items-center gap-2 min-w-0">
-          <select
-            id="calendar-select"
-            value={selectedCalendarId}
-            onChange={(e) => setSelectedCalendarId(e.target.value)}
-            className="min-w-0 flex-1 sm:flex-none sm:max-w-sm truncate border border-stone-300 rounded-md px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-brand-700 focus:outline-none"
-          >
-            <optgroup label="Minhas agendas">
-              {ownedCalendars.map((cal) => (
-                <option key={cal.id} value={cal.id}>
-                  {cal.name}
-                </option>
-              ))}
-            </optgroup>
-            {delegatedCalendars.length > 0 && (
-              <optgroup label="Agendas que gerencio">
-                {delegatedCalendars.map((cal) => (
-                  <option key={cal.id} value={cal.id}>
-                    {cal.name} ({cal.owner?.name ?? 'Outro'})
-                  </option>
-                ))}
-              </optgroup>
-            )}
-          </select>
-          {activeCalendar?.color && (
-            <span
-              className="w-3 h-3 rounded-full shrink-0"
-              style={{ backgroundColor: activeCalendar.color }}
-              aria-hidden="true"
-            />
-          )}
-        </div>
-      </div>
-
-      {/* 2. Cabeçalho da data e controles */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mt-6">
+      {/* Cabeçalho da data e controles */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-semibold text-stone-900">
             {isMonthView ? formatMonthYear(selectedDate) : formatLongDate(selectedDate)}

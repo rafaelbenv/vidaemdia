@@ -58,6 +58,8 @@ import { useTelegramLink } from './hooks/useTelegramLink';
 import { ConfirmDialog, ConfirmModalProps } from './components/ConfirmDialog';
 import { FeedbackBanner } from './components/FeedbackBanner';
 import { UserMenu } from './components/UserMenu';
+import { CalendarMenu } from './components/CalendarMenu';
+import { CalendarBanner } from './components/CalendarBanner';
 import { SessionLoading } from './components/SessionLoading';
 import { SessionLoadError } from './components/SessionLoadError';
 import { BastidoresLayout } from './components/BastidoresLayout';
@@ -72,6 +74,7 @@ import { AuditoriaPage } from './pages/AuditoriaPage';
 import { SaudePage } from './pages/SaudePage';
 
 const CHAT_STORAGE_KEY = 'vidaemdia_chat';
+const AGENDA_STORAGE_KEY = 'vidaemdia_agenda';
 
 function createWelcomeMessage(): ChatMessage[] {
   return [
@@ -106,10 +109,35 @@ export function App() {
   const [user, setUser] = useState<User | null>(null);
   const { userMenuOpen, setUserMenuOpen, userMenuRef } = useUserMenu();
 
+  // Loading & Data State
+  const [loading, setLoading] = useState(false);
+  const [ownedCalendars, setOwnedCalendars] = useState<Calendar[]>([]);
+  const [delegatedCalendars, setDelegatedCalendars] = useState<Calendar[]>([]);
+  const [selectedCalendarId, setSelectedCalendarId] = useState<string>('');
+
+  const allAccessibleCalendars = [...ownedCalendars, ...delegatedCalendars];
+  const activeCalendar = allAccessibleCalendars.find((c) => c.id === selectedCalendarId);
+  const canShareSelected = Boolean(
+    activeCalendar && (activeCalendar.ownerId === user?.id || user?.role === 'ADMIN'),
+  );
+
   const rawPath = location.pathname.replace(/\/+$/, '') || '/';
   const section = sectionFromPath(rawPath);
-  const canShare = user?.role === 'PROFESSIONAL' || user?.role === 'ADMIN';
   const canControlWorker = user?.role === 'PROFESSIONAL' || user?.role === 'ADMIN';
+
+  function handleSelectCalendar(id: string) {
+    setSelectedCalendarId(id);
+    try {
+      localStorage.setItem(AGENDA_STORAGE_KEY, id);
+    } catch {
+      // Ignora erro ao salvar no localStorage
+    }
+    const target = allAccessibleCalendars.find((c) => c.id === id);
+    const targetCanShare = target ? target.ownerId === user?.id || user?.role === 'ADMIN' : false;
+    if (rawPath === COMPARTILHAR_PATH && !targetCanShare) {
+      navigate(AGENDA_PATH);
+    }
+  }
 
   // Redirecionamento baseado na sessão e na URL
   useEffect(() => {
@@ -128,12 +156,22 @@ export function App() {
     const currentSection = sectionFromPath(path);
     const isBastidoresValid = currentSection !== null && SHOW_BASTIDORES;
     const isAgenda = path === AGENDA_PATH;
-    const isCompartilharValid = path === COMPARTILHAR_PATH && canShare;
 
-    if (!isBastidoresValid && !isAgenda && !isCompartilharValid) {
+    if (path === COMPARTILHAR_PATH) {
+      if (loading || allAccessibleCalendars.length === 0) {
+        return; // Aguardar as agendas carregarem antes de redirecionar
+      }
+      if (!canShareSelected) {
+        navigate(AGENDA_PATH, { replace: true });
+        return;
+      }
+      return;
+    }
+
+    if (!isBastidoresValid && !isAgenda) {
       navigate(AGENDA_PATH, { replace: true });
     }
-  }, [token, user, canShare, location.pathname, navigate]);
+  }, [token, user, canShareSelected, loading, allAccessibleCalendars.length, location.pathname, navigate]);
 
   // Telegram Integration State
   const {
@@ -151,12 +189,8 @@ export function App() {
   const [password, setPassword] = useState('123456');
   const [authError, setAuthError] = useState<string | null>(null);
   const [initialLoadError, setInitialLoadError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  // Data State
-  const [ownedCalendars, setOwnedCalendars] = useState<Calendar[]>([]);
-  const [delegatedCalendars, setDelegatedCalendars] = useState<Calendar[]>([]);
-  const [selectedCalendarId, setSelectedCalendarId] = useState<string>('');
+  // Appointments, Professionals & Audit State
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loadingAppointments, setLoadingAppointments] = useState<boolean>(false);
   const [professionals, setProfessionals] = useState<ProfessionalDirectoryEntry[]>([]);
@@ -332,10 +366,20 @@ export function App() {
         stopPolling();
       }
 
-      const firstCal = calData.owned[0]?.id || calData.delegated[0]?.id || '';
-      if (firstCal && !selectedCalendarId) {
-        setSelectedCalendarId(firstCal);
+      const allAccessible = [...calData.owned, ...calData.delegated];
+      let initialCalId = '';
+      try {
+        const savedId = localStorage.getItem(AGENDA_STORAGE_KEY);
+        if (savedId && allAccessible.some((c) => c.id === savedId)) {
+          initialCalId = savedId;
+        }
+      } catch {
+        // Fallback para seleção padrão
       }
+      if (!initialCalId) {
+        initialCalId = calData.owned[0]?.id || calData.delegated[0]?.id || '';
+      }
+      setSelectedCalendarId(initialCalId);
     } catch (err: unknown) {
       if (errorStatus(err) === 401) {
         handleLogout();
@@ -827,9 +871,6 @@ export function App() {
     return <SessionLoading />;
   }
 
-  const allAccessibleCalendars = [...ownedCalendars, ...delegatedCalendars];
-  const activeCalendar = allAccessibleCalendars.find((c) => c.id === selectedCalendarId);
-
   const isOwnerOrAdmin = activeCalendar
     ? activeCalendar.ownerId === user.id || user.role === 'ADMIN'
     : false;
@@ -933,22 +974,28 @@ export function App() {
     <div className="min-h-screen bg-stone-50 flex flex-col">
       {/* Top Navbar */}
       <header className="bg-stone-900 text-white border-b border-stone-800 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-brand-700 rounded-md">
-              <CalendarIcon className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-lg">VidaEmDia</span>
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="p-1.5 bg-brand-700 rounded-md">
+                <CalendarIcon className="w-5 h-5 text-white" />
               </div>
-              <p className="text-xs text-stone-400">
-                Controle de Agenda Pessoal & Profissional · RBAC · Worker Telegram
-              </p>
+              <span className="font-bold text-lg hidden sm:inline">VidaEmDia</span>
             </div>
+
+            {(rawPath === AGENDA_PATH || rawPath === COMPARTILHAR_PATH) && (
+              <CalendarMenu
+                owned={ownedCalendars}
+                delegated={delegatedCalendars}
+                selectedId={selectedCalendarId}
+                canShareSelected={canShareSelected}
+                onSelect={handleSelectCalendar}
+                onShare={() => navigate(COMPARTILHAR_PATH)}
+              />
+            )}
           </div>
 
-          {/* Menu do Avatar (agrupa Telegram, Informações do Usuário, Compartilhar, Bastidores e Sair) */}
+          {/* Menu do Avatar */}
           <UserMenu
             user={user}
             userMenuOpen={userMenuOpen}
@@ -961,24 +1008,26 @@ export function App() {
             handleConnectTelegram={handleConnectTelegram}
             openUnlinkTelegramDialog={openUnlinkTelegramDialog}
             openLogoutDialog={openLogoutDialog}
-            canShare={canShare}
             showBastidores={SHOW_BASTIDORES}
-            onOpenShare={() => navigate(COMPARTILHAR_PATH)}
             onOpenBastidores={() => navigate(bastidoresPath('lembretes'))}
           />
         </div>
       </header>
+
+      {activeCalendar && activeCalendar.ownerId !== user.id && (
+        <CalendarBanner calendar={activeCalendar} />
+      )}
 
       {/* Banner de Feedback de Operações */}
       {feedbackBannerElement}
 
       {/* Conteúdo Principal */}
       <main className="max-w-7xl mx-auto w-full px-4 py-6 flex-1">
-        {rawPath === COMPARTILHAR_PATH && canShare ? (
+        {rawPath === COMPARTILHAR_PATH && canShareSelected ? (
           <CompartilharPage
             onBack={() => navigate(AGENDA_PATH)}
             selectedCalendarId={selectedCalendarId}
-            setSelectedCalendarId={setSelectedCalendarId}
+            setSelectedCalendarId={handleSelectCalendar}
             ownedCalendars={ownedCalendars}
             secretaryEmailToGrant={secretaryEmailToGrant}
             setSecretaryEmailToGrant={setSecretaryEmailToGrant}
@@ -987,9 +1036,6 @@ export function App() {
           />
         ) : (
           <AgendaPage
-            allAccessibleCalendars={allAccessibleCalendars}
-            selectedCalendarId={selectedCalendarId}
-            setSelectedCalendarId={setSelectedCalendarId}
             user={user}
             activeCalendar={activeCalendar}
             canCreate={canCreateAppt}
