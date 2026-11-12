@@ -128,3 +128,11 @@ export interface DispatchedMessageLog {
   timestamp: string;
 }
 
+export interface ChatMessage {
+  sender: 'USER' | 'BOT';
+  text: string;
+  time: string;
+  channel: string;
+}
+
+
