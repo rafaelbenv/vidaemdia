@@ -968,6 +968,8 @@ export function App() {
             appointments={appointments}
             openCancelDialog={openCancelDialog}
             maxRetries={workerStats?.maxRetries ?? 3}
+            telegramLinked={telegramLinked}
+            onConnectTelegram={handleConnectTelegram}
           />
         )}
       </main>

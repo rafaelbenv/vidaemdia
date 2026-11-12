@@ -82,6 +82,12 @@ export interface Appointment {
   status: AppointmentStatus;
   createdVia: 'WEB' | 'WHATSAPP' | 'TELEGRAM';
   createdBy?: User;
+  calendar?: {
+    id: string;
+    name?: string;
+    ownerId?: string;
+    owner?: { id: string; name: string; telegramChatId?: string | null };
+  };
   reminders: Reminder[];
 }
 
