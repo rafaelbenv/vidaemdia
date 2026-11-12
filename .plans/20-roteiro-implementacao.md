@@ -110,6 +110,23 @@ As dependências internas precisam ser respeitadas.
 | 7.10 | Dashboards do Grafana provisionados e regras de alerta no Prometheus. | S12 | 7.6 | M |
 | 7.11 | Testes de compromissos (conflito de horário) e do worker. | S14 (parte 2) | 7.2 | M |
 
+### Bloco 8 — Sincronização com o Google Agenda (nos dois sentidos)
+
+Adicionado em 2026-11-12, por sugestão do professor. Análise completa e regras decididas em `.plans/29-google-agenda-analise.md`.
+Compromissos criados no VidaEmDia vão para o Google Agenda e vice-versa; os importados também recebem lembrete pelo Telegram.
+
+| Passo | Entrega | Cobre | Depende de | Esforço |
+|-------|---------|-------|------------|---------|
+| 8.1 | Projeto no Google Cloud, variáveis `GOOGLE_*`, tabela `GoogleAccount` com token criptografado, conectar e desconectar (OAuth). | G1 | 7.1, 7.4 | M |
+| 8.2 | Ligar uma agenda do VidaEmDia a uma agenda do Google (só o dono); listar as agendas do Google. | G2 | 8.1 | P |
+| 8.3 | VidaEmDia → Google: fila de saída (`GoogleSyncJob`) alimentada por criar, alterar e cancelar, mais o worker com tentativas. | G3 | 8.2, 7.2 | M |
+| 8.4 | Google → VidaEmDia: carga inicial e incremental (`syncToken`, 410), sem eco, cancelamento. | G4 | 8.3 | G |
+| 8.5 | Regras: conflito sinalizado (não recusado), dia inteiro (lembrete às 8h), privacidade ("Ocupado" para quem não é dono), convites recusados, última alteração vence. | G5 | 8.4 | G |
+| 8.6 | Front: conectar, escolher agenda, marcas "Google", "Conflito", "Dia inteiro" e "Ocupado", opção "Dia inteiro" no painel. | G6 | 8.5, 4.2 | M |
+| 8.7 | Testes (client do Google com mock) e métricas de sincronização. | G7 | 8.5 | M |
+
+Atenção: em modo de teste no Google, o refresh token expira em 7 dias. Para a apresentação, reconectar antes.
+
 ## 2. Dependências que mais importam
 
 Estas são as ordens que não podem ser invertidas, com o motivo:
@@ -121,6 +138,7 @@ Estas são as ordens que não podem ser invertidas, com o motivo:
 5. **7.1 antes de qualquer mudança no banco** (7.2 e 7.3). Sem migrations, a mudança é aplicada com `--accept-data-loss`.
 6. **7.3 depois de 6.3.** O front ainda converte `WHATSAPP` e `BOTH` para "TELEGRAM" na tela; tirar os valores do enum antes quebra os tipos.
 7. **0.4 antes de tudo que é delegado.** O CI é a conferência de cada entrega.
+8. **7.1, 7.2 e 7.4 antes do Bloco 8.** Ele muda o banco, guarda credencial do Google e tem worker próprio, que precisa da reserva no banco para não duplicar.
 
 ## 3. Onde foi parar cada item do plano 18
 
@@ -181,6 +199,9 @@ Ordem de corte, do que sai primeiro para o que sai por último:
 2. 6.5 (testes do front) e 2.5 (tipos).
 3. 4.3 (visão de mês) e 5.3 (histórico).
 4. 7.2, 7.3, 7.8.
+
+Bloco 8, se o prazo apertar: sai primeiro o 8.7; depois o 8.4 e o 8.5 (fica só VidaEmDia → Google, que já demonstra a integração).
+Mínimo da integração: 8.1, 8.2, 8.3 e a parte de "conectar" do 8.6.
 
 Mínimo para apresentar o novo front com segurança básica:
 blocos 0, 1 (sem 1.5), 2 (sem 2.5), 3, passos 4.1 e 4.2, 5.1 e 5.2, 6.2 e 6.3, mais 7.1 e 7.4.
