@@ -49,7 +49,7 @@ export function WeekStrip({ selected, counts, onSelect }: WeekStripProps) {
           >
             <span
               className={`text-xs ${
-                isSelected ? 'text-white/80' : 'text-stone-500'
+                isSelected ? 'text-white/90' : 'text-stone-500'
               }`}
             >
               {weekdayShort}
@@ -59,7 +59,7 @@ export function WeekStrip({ selected, counts, onSelect }: WeekStripProps) {
             </span>
             <span
               className={`text-xs ${
-                isSelected ? 'text-white/80' : 'text-stone-600'
+                isSelected ? 'text-white/90' : 'text-stone-500'
               }`}
             >
               {count > 0 ? count : '·'}

@@ -56,7 +56,7 @@ export function CalendarMenu({
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/10 text-white min-h-[44px] transition focus:outline-none focus:ring-2 focus:ring-brand-500"
+        className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/10 text-white min-h-[44px] transition focus:outline-none focus:ring-2 focus:ring-brand-500 focus-visible:outline-white"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Menu de agendas"
@@ -100,7 +100,7 @@ export function CalendarMenu({
                       onSelect(cal.id);
                       setOpen(false);
                     }}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-stone-100 flex items-center gap-2 min-h-[40px] text-stone-900"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-stone-100 flex items-center gap-2 min-h-11 min-w-11 sm:min-h-[40px] sm:min-w-0 text-stone-900"
                   >
                     <span
                       className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -139,7 +139,7 @@ export function CalendarMenu({
                       onSelect(cal.id);
                       setOpen(false);
                     }}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-stone-100 flex items-center gap-2 min-h-[40px] text-stone-900"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-stone-100 flex items-center gap-2 min-h-11 min-w-11 sm:min-h-[40px] sm:min-w-0 text-stone-900"
                   >
                     <span
                       className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -174,7 +174,7 @@ export function CalendarMenu({
                   setOpen(false);
                   onShare();
                 }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-stone-100 flex items-center gap-2 min-h-[40px] text-stone-700"
+                className="w-full text-left px-3 py-2 text-sm hover:bg-stone-100 flex items-center gap-2 min-h-11 min-w-11 sm:min-h-[40px] sm:min-w-0 text-stone-700"
               >
                 <Users className="w-4 h-4 text-stone-500 shrink-0" />
                 <span>Compartilhar esta agenda</span>
@@ -186,7 +186,7 @@ export function CalendarMenu({
                   setOpen(false);
                   onHistory();
                 }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-stone-100 flex items-center gap-2 min-h-[40px] text-stone-700"
+                className="w-full text-left px-3 py-2 text-sm hover:bg-stone-100 flex items-center gap-2 min-h-11 min-w-11 sm:min-h-[40px] sm:min-w-0 text-stone-700"
               >
                 <History className="w-4 h-4 text-stone-500 shrink-0" />
                 <span>Histórico desta agenda</span>

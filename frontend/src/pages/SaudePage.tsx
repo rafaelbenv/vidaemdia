@@ -30,7 +30,7 @@ export function SaudePage({ healthData, auditLogsCount = 0 }: SaudePageProps) {
               <Activity className="w-4 h-4 text-emerald-600" />
             </div>
             <div className="text-lg font-bold text-emerald-600">{healthData.status}</div>
-            <div className="text-xs font-mono text-[11px] text-stone-400 mt-1">
+            <div className="text-xs font-mono text-[11px] text-stone-500 mt-1">
               DB: {healthData.services?.postgresql} · Worker: {healthData.services?.notificationWorker}
             </div>
           </div>
@@ -43,7 +43,7 @@ export function SaudePage({ healthData, auditLogsCount = 0 }: SaudePageProps) {
             <div className="text-lg font-bold text-stone-900 tabular-nums">
               {healthData.databaseStats?.appointmentsCount ?? 0}
             </div>
-            <div className="text-xs text-stone-400 mt-1">
+            <div className="text-xs text-stone-500 mt-1">
               Agendas ativas: {healthData.databaseStats?.calendarsCount ?? 0}
             </div>
           </div>
@@ -56,7 +56,7 @@ export function SaudePage({ healthData, auditLogsCount = 0 }: SaudePageProps) {
             <div className="text-lg font-bold text-amber-600 tabular-nums">
               {healthData.metrics?.rbacAccessDenied ?? 0}
             </div>
-            <div className="text-xs text-stone-400 mt-1">
+            <div className="text-xs text-stone-500 mt-1">
               Tentativas não autorizadas barradas
             </div>
           </div>
@@ -69,7 +69,7 @@ export function SaudePage({ healthData, auditLogsCount = 0 }: SaudePageProps) {
             <div className="text-lg font-bold text-stone-900 tabular-nums">
               {healthData.databaseStats?.auditLogsCount ?? auditLogsCount}
             </div>
-            <div className="text-xs text-stone-400 mt-1">
+            <div className="text-xs text-stone-500 mt-1">
               Rastreabilidade completa (Quem / Quando)
             </div>
           </div>

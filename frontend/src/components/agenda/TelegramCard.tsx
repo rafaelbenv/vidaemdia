@@ -53,7 +53,7 @@ export function TelegramCard({
         <button
           type="button"
           onClick={onDismiss}
-          className="text-sm text-stone-500 hover:text-stone-800 transition"
+          className="text-sm text-stone-500 hover:text-stone-800 transition min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center"
         >
           Agora não
         </button>

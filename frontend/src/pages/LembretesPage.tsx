@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, RefreshCw, Smartphone } from 'lucide-react';
+import { AlertTriangle, Bell, RefreshCw, Send, Smartphone, XCircle } from 'lucide-react';
 import { DispatchedMessageLog, Reminder, WorkerStats } from '../types';
 import { TechTag } from '../components/TechTag';
 
@@ -41,10 +41,10 @@ export function LembretesPage({
               </div>
 
               {canControlWorker ? (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={handleSimulateFailure}
-                    className="px-3 py-2 rounded-md border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold transition"
+                    className="px-3 py-2 rounded-md border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold transition min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center text-center"
                   >
                     Simular Erro na API (Testar Retry {workerStats?.maxRetries ?? 3}x)
                   </button>
@@ -52,7 +52,7 @@ export function LembretesPage({
                   <button
                     onClick={handleRunWorkerNow}
                     disabled={submitting['worker']}
-                    className="px-4 py-2 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-semibold shadow flex items-center gap-1.5 transition"
+                    className="px-4 py-2 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-semibold shadow flex items-center justify-center gap-1.5 transition min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 text-center"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${submitting['worker'] ? 'animate-spin' : ''}`} />
                     {submitting['worker'] ? 'Executando…' : 'Executar Ciclo do Worker Agora'}
@@ -117,8 +117,9 @@ export function LembretesPage({
                         Tentativas: <b>{rem.retryCount}/{workerStats?.maxRetries ?? 3}</b>
                       </div>
                       {rem.lastError && (
-                        <div className="text-red-600 text-xs mt-1 font-medium">
-                          ⚠️ Último erro: {rem.lastError}
+                        <div className="text-red-600 text-xs mt-1 font-medium flex items-center gap-1">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+                          <span>Último erro: {rem.lastError}</span>
                         </div>
                       )}
                     </div>
@@ -157,7 +158,7 @@ export function LembretesPage({
             </div>
           </div>
 
-          <div className="flex-1 space-y-3 overflow-y-auto max-h-[460px] pr-1">
+          <div className="flex-1 space-y-3 overflow-y-auto max-h-[60vh] sm:max-h-[460px] pr-1">
             {dispatchedMessages.length === 0 ? (
               <div className="text-center py-12 text-stone-500 text-xs">
                 Nenhuma mensagem disparada ainda. Clique em{' '}
@@ -174,8 +175,9 @@ export function LembretesPage({
                   }`}
                 >
                   <div className="flex items-center justify-between text-xs opacity-75 mb-1.5">
-                    <span className="font-bold">
-                      ✈️ Telegram → {msg.recipientName} ({msg.recipient})
+                    <span className="font-bold flex items-center gap-1">
+                      <Send className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                      <span>Telegram → {msg.recipientName} ({msg.recipient})</span>
                     </span>
                     <span className="font-mono text-[11px] tabular-nums">
                       {new Date(msg.timestamp).toLocaleTimeString('pt-BR', {
@@ -189,8 +191,9 @@ export function LembretesPage({
                     {msg.message}
                   </pre>
                   {!msg.success && (
-                    <div className="mt-2 pt-1.5 border-t border-red-800 text-xs text-red-300 font-semibold">
-                      ❌ Falha simulada: {msg.error} (Agendado Retry)
+                    <div className="mt-2 pt-1.5 border-t border-red-800 text-xs text-red-300 font-semibold flex items-center gap-1">
+                      <XCircle className="w-3.5 h-3.5 shrink-0 text-red-400" />
+                      <span>Falha simulada: {msg.error} (Agendado Retry)</span>
                     </div>
                   )}
                 </div>

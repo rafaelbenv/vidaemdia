@@ -65,7 +65,7 @@ export function Toast({ toast, onClose }: ToastProps) {
         type="button"
         onClick={onClose}
         aria-label="Fechar aviso"
-        className="text-stone-400 hover:text-stone-600 transition-colors p-1 -mr-1 -mt-0.5 rounded focus:outline-none focus:ring-2 focus:ring-stone-400 shrink-0"
+        className="text-stone-400 hover:text-stone-600 transition-colors p-1 -mr-1 -mt-0.5 rounded focus:outline-none focus:ring-2 focus:ring-stone-400 shrink-0 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 flex items-center justify-center"
       >
         <X className="w-4 h-4" />
       </button>

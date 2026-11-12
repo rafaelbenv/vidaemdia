@@ -70,7 +70,7 @@ export function TesteAcessoPage({
 
                   <button
                     onClick={() => handleSelectProfessionalCalendar(cal.id, prof.name)}
-                    className={`px-3.5 py-2 rounded-md text-xs font-semibold transition ${
+                    className={`px-3.5 py-2 rounded-md text-xs font-semibold transition min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center text-center ${
                       cal.hasRbacAuthorization || prof.id === user.id
                         ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                         : 'bg-white hover:bg-red-50 text-red-600 border border-red-500'

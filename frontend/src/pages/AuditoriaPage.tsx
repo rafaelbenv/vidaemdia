@@ -21,8 +21,63 @@ export function AuditoriaPage({ auditLogs }: AuditoriaPageProps) {
         </p>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse text-xs">
+      {/* Mobile: Lista de cartões (< md) */}
+      <div className="md:hidden space-y-3">
+        {auditLogs.length === 0 ? (
+          <div className="py-8 px-4 text-center">
+            <FileText className="w-8 h-8 text-stone-400 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-stone-700">Nenhum registro de auditoria encontrado</p>
+            <p className="text-xs text-stone-500 mt-1 max-w-md mx-auto">
+              Operações como criar ou cancelar compromissos, conceder permissões e bloqueios RBAC (403) serão registradas automaticamente nesta lista.
+            </p>
+          </div>
+        ) : (
+          auditLogs.map((log) => (
+            <div key={log.id} className="p-3 bg-stone-50 rounded-lg border border-stone-200 space-y-2 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-[11px] text-stone-500 tabular-nums">
+                  {new Date(log.createdAt).toLocaleString('pt-BR')}
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded-md font-bold text-[11px] font-mono ${
+                    log.action === 'ACCESS_DENIED'
+                      ? 'bg-red-100 text-red-800'
+                      : log.action === 'CREATE'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : log.action === 'CANCEL'
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-brand-50 text-brand-800'
+                  }`}
+                >
+                  {log.action}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium text-stone-900">
+                  {log.actorUser?.name || 'Sistema'}{' '}
+                  {log.actorUser?.role && (
+                    <span className="text-[11px] px-1.5 py-0.5 bg-stone-100 rounded-md font-mono text-stone-600">
+                      {log.actorUser.role}
+                    </span>
+                  )}
+                </span>
+                <span className="text-stone-600 truncate">
+                  {log.targetCalendar?.name || '—'}
+                </span>
+              </div>
+              {log.details && (
+                <div className="text-xs text-stone-700 pt-1.5 border-t border-stone-200">
+                  {log.details}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop: Tabela (>= md) */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="hidden md:table w-full text-left border-collapse text-xs">
           <thead>
             <tr className="border-b border-stone-200 text-stone-500 uppercase text-xs font-medium">
               <th className="py-2.5 px-3">Data / Hora</th>

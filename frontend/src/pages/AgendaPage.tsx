@@ -206,7 +206,7 @@ export function AgendaPage({
               type="button"
               onClick={() => handleViewChange('dia')}
               aria-pressed={!isMonthView}
-              className={`px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition ${
+              className={`px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center ${
                 !isMonthView
                   ? 'bg-white shadow-sm text-stone-900'
                   : 'text-stone-600 hover:text-stone-900'
@@ -218,7 +218,7 @@ export function AgendaPage({
               type="button"
               onClick={() => handleViewChange('mes')}
               aria-pressed={isMonthView}
-              className={`px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition ${
+              className={`px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center ${
                 isMonthView
                   ? 'bg-white shadow-sm text-stone-900'
                   : 'text-stone-600 hover:text-stone-900'
@@ -233,7 +233,7 @@ export function AgendaPage({
           <button
             type="button"
             onClick={handleToday}
-            className="border border-stone-300 rounded-md px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition"
+            className="border border-stone-300 rounded-md px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center"
           >
             Hoje
           </button>
@@ -241,7 +241,7 @@ export function AgendaPage({
             type="button"
             onClick={handlePrev}
             aria-label={isMonthView ? 'Mês anterior' : 'Semana anterior'}
-            className="p-2 border border-stone-300 rounded-md hover:bg-stone-50 text-stone-600 transition flex items-center justify-center"
+            className="p-2 border border-stone-300 rounded-md hover:bg-stone-50 text-stone-600 transition flex items-center justify-center min-h-11 min-w-11 sm:min-h-0 sm:min-w-0"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -249,7 +249,7 @@ export function AgendaPage({
             type="button"
             onClick={handleNext}
             aria-label={isMonthView ? 'Próximo mês' : 'Próxima semana'}
-            className="p-2 border border-stone-300 rounded-md hover:bg-stone-50 text-stone-600 transition flex items-center justify-center"
+            className="p-2 border border-stone-300 rounded-md hover:bg-stone-50 text-stone-600 transition flex items-center justify-center min-h-11 min-w-11 sm:min-h-0 sm:min-w-0"
           >
             <ChevronRight className="w-4 h-4" />
           </button>

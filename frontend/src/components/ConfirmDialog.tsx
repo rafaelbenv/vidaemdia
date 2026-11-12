@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { RefreshCw } from 'lucide-react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 export interface ConfirmDialogProps {
   isOpen: boolean;
@@ -37,7 +38,10 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
   const safeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useFocusTrap(dialogRef, isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -69,7 +73,8 @@ export function ConfirmDialog({
       }}
     >
       <div
-        role="dialog"
+        ref={dialogRef}
+        role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 border border-stone-200 text-stone-900"

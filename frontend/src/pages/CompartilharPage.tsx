@@ -333,14 +333,14 @@ export function CompartilharPage({
                         });
                         setEditError(null);
                       }}
-                      className="text-xs font-medium text-stone-700 hover:text-stone-900 min-h-[44px] px-2 py-1 inline-flex items-center"
+                      className="text-xs font-medium text-stone-700 hover:text-stone-900 min-h-11 min-w-11 sm:min-h-[44px] sm:min-w-0 px-2 py-1 inline-flex items-center justify-center"
                     >
                       Alterar
                     </button>
                     <button
                       type="button"
                       onClick={() => onRevoke(perm)}
-                      className="text-xs font-medium text-red-700 hover:text-red-800 min-h-[44px] px-2 py-1 inline-flex items-center"
+                      className="text-xs font-medium text-red-700 hover:text-red-800 min-h-11 min-w-11 sm:min-h-[44px] sm:min-w-0 px-2 py-1 inline-flex items-center justify-center"
                     >
                       Remover
                     </button>

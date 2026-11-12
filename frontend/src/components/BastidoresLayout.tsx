@@ -35,7 +35,7 @@ export function BastidoresLayout({
           <button
             type="button"
             onClick={onBack}
-            className="text-sm text-stone-200 hover:text-white transition inline-flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500 rounded"
+            className="text-sm text-stone-200 hover:text-white transition inline-flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500 focus-visible:outline-white rounded min-h-11 min-w-11 sm:min-h-0 sm:min-w-0"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Voltar para a agenda</span>

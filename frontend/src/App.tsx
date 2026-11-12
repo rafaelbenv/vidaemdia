@@ -186,6 +186,7 @@ export function App() {
     setTelegramWaiting,
     pollingRef,
     pollingTimeoutRef,
+    visibilityListenerRef,
     stopPolling,
   } = useTelegramLink();
 
@@ -515,7 +516,11 @@ export function App() {
       const startTime = Date.now();
       const maxDuration = 10 * 60 * 1000; // 10 minutos
 
-      pollingRef.current = window.setInterval(async () => {
+      const checkTelegram = async () => {
+        if (Date.now() - startTime >= maxDuration) {
+          stopPolling();
+          return;
+        }
         try {
           const status = await getTelegramStatus(token);
           if (status.linked) {
@@ -530,11 +535,34 @@ export function App() {
         } catch {
           // Ignora erros transitórios no polling
         }
+      };
 
-        if (Date.now() - startTime >= maxDuration) {
-          stopPolling();
+      const startPollingInterval = () => {
+        if (pollingRef.current === null && !document.hidden) {
+          pollingRef.current = window.setInterval(checkTelegram, 3000);
         }
-      }, 3000);
+      };
+
+      const pausePollingInterval = () => {
+        if (pollingRef.current !== null) {
+          window.clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+      };
+
+      const handleVisibilityChange = () => {
+        if (document.hidden) {
+          pausePollingInterval();
+        } else {
+          void checkTelegram();
+          startPollingInterval();
+        }
+      };
+
+      visibilityListenerRef.current = handleVisibilityChange;
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      startPollingInterval();
 
       pollingTimeoutRef.current = window.setTimeout(() => {
         stopPolling();

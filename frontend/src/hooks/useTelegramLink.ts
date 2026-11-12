@@ -5,6 +5,7 @@ export function useTelegramLink() {
   const [telegramWaiting, setTelegramWaiting] = useState<boolean>(false);
   const pollingRef = useRef<number | null>(null);
   const pollingTimeoutRef = useRef<number | null>(null);
+  const visibilityListenerRef = useRef<(() => void) | null>(null);
 
   const stopPolling = () => {
     if (pollingRef.current !== null) {
@@ -14,6 +15,10 @@ export function useTelegramLink() {
     if (pollingTimeoutRef.current !== null) {
       window.clearTimeout(pollingTimeoutRef.current);
       pollingTimeoutRef.current = null;
+    }
+    if (visibilityListenerRef.current !== null) {
+      document.removeEventListener('visibilitychange', visibilityListenerRef.current);
+      visibilityListenerRef.current = null;
     }
     setTelegramWaiting(false);
   };
@@ -31,6 +36,7 @@ export function useTelegramLink() {
     setTelegramWaiting,
     pollingRef,
     pollingTimeoutRef,
+    visibilityListenerRef,
     stopPolling,
   };
 }

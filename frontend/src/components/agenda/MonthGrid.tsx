@@ -72,7 +72,7 @@ export function MonthGrid({
             >
               <span
                 className={`text-xs sm:text-sm font-semibold tabular-nums ${
-                  isPast ? 'text-stone-400' : 'text-stone-900'
+                  isPast ? 'text-stone-500' : 'text-stone-900'
                 }`}
               >
                 {item.getDate()}
@@ -88,7 +88,7 @@ export function MonthGrid({
               {count > 0 && (
                 <span
                   className={`text-[11px] sm:text-xs ${
-                    isPast ? 'text-stone-400' : 'text-stone-600'
+                    isPast ? 'text-stone-500' : 'text-stone-600'
                   }`}
                 >
                   <span className="sm:hidden">{count}</span>

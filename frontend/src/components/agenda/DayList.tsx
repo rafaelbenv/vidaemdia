@@ -79,7 +79,7 @@ export function DayList({
         <button
           type="button"
           onClick={() => setShowCancelled(!showCancelled)}
-          className="text-xs text-stone-500 hover:text-stone-800"
+          className="text-xs text-stone-500 hover:text-stone-800 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 inline-flex items-center"
         >
           {label}
         </button>

@@ -30,7 +30,7 @@ export function AssistentePage({
                 Assistente VidaEmDia
                 <TechTag>Chatbot Telegram (Webhook)</TechTag>
               </h2>
-              <p className="text-xs text-brand-50">
+              <p className="text-xs text-white/90">
                 Envie uma mensagem para criar ou consultar eventos na sua agenda automaticamente
               </p>
             </div>
@@ -38,9 +38,9 @@ export function AssistentePage({
         </div>
 
         {/* Histórico de Mensagens */}
-        <div className="p-5 bg-stone-100 h-96 overflow-y-auto space-y-3">
+        <div className="p-5 bg-stone-100 max-h-[60vh] sm:h-96 overflow-y-auto space-y-3">
           {chatHistory.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center p-6 text-stone-400">
+            <div className="h-full flex flex-col items-center justify-center text-center p-6 text-stone-500">
               <MessageSquare className="w-8 h-8 text-stone-400 mb-2" />
               <p className="text-sm font-semibold text-stone-700">Histórico do chat vazio</p>
               <p className="text-xs text-stone-500 mt-1 max-w-sm">
@@ -70,7 +70,7 @@ export function AssistentePage({
                   )}
                   <div
                     className={`text-xs mt-1 text-right font-mono text-[11px] tabular-nums ${
-                      item.sender === 'USER' ? 'text-brand-50/80' : 'text-stone-400'
+                      item.sender === 'USER' ? 'text-white/90' : 'text-stone-500'
                     }`}
                   >
                     {item.time}
@@ -87,21 +87,21 @@ export function AssistentePage({
           <button
             type="button"
             onClick={() => setBotInput('agenda')}
-            className="text-xs px-2.5 py-1 bg-white border border-stone-300 rounded-md hover:bg-stone-100"
+            className="text-xs px-2.5 py-1 bg-white border border-stone-300 rounded-md hover:bg-stone-100 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center"
           >
             "agenda"
           </button>
           <button
             type="button"
             onClick={() => setBotInput('Marcar Consulta médica hoje às 08:00')}
-            className="text-xs px-2.5 py-1 bg-white border border-stone-300 rounded-md hover:bg-stone-100"
+            className="text-xs px-2.5 py-1 bg-white border border-stone-300 rounded-md hover:bg-stone-100 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center"
           >
             "Marcar Consulta médica hoje às 08:00"
           </button>
           <button
             type="button"
             onClick={() => setBotInput('Agendar Reunião de Alinhamento amanhã às 15:00')}
-            className="text-xs px-2.5 py-1 bg-white border border-stone-300 rounded-md hover:bg-stone-100"
+            className="text-xs px-2.5 py-1 bg-white border border-stone-300 rounded-md hover:bg-stone-100 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center"
           >
             "Agendar Reunião de Alinhamento amanhã às 15:00"
           </button>
@@ -112,7 +112,11 @@ export function AssistentePage({
           onSubmit={handleSendBotMessage}
           className="p-4 bg-white border-t border-stone-200 flex gap-2"
         >
+          <label htmlFor="bot-input" className="sr-only">
+            Mensagem para o assistente
+          </label>
           <input
+            id="bot-input"
             type="text"
             value={botInput}
             onChange={(e) => setBotInput(e.target.value)}
@@ -122,7 +126,7 @@ export function AssistentePage({
           <button
             type="submit"
             disabled={submitting['chat']}
-            className="px-5 py-2.5 bg-brand-700 hover:bg-brand-800 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md flex items-center gap-1.5 transition"
+            className="px-5 py-2.5 bg-brand-700 hover:bg-brand-800 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md flex items-center justify-center gap-1.5 transition min-h-11 min-w-11 sm:min-h-0 sm:min-w-0"
           >
             {submitting['chat'] ? (
               <>

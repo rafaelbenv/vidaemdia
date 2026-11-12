@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, Loader2, X } from 'lucide-react';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { Appointment, Calendar } from '../../types';
 import { checkIsPast, todayStr } from '../../lib/format';
 import { formatTime, toDateKey } from '../../lib/dates';
@@ -109,7 +110,10 @@ export function AppointmentPanel({
     endTime?: string;
   }>({});
 
+  const panelRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+
+  useFocusTrap(panelRef, true);
 
   useEffect(() => {
     titleInputRef.current?.focus();
@@ -118,6 +122,14 @@ export function AppointmentPanel({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        const modals = Array.from(
+          document.querySelectorAll<HTMLElement>('[role="alertdialog"], [aria-modal="true"]'),
+        );
+        const myIndex = panelRef.current ? modals.indexOf(panelRef.current) : -1;
+        const hasModalAfter = modals.slice(myIndex + 1).length > 0;
+        if (hasModalAfter) {
+          return;
+        }
         onClose();
       }
     };
@@ -195,6 +207,7 @@ export function AppointmentPanel({
 
       {/* Painel lateral / tela cheia no celular */}
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="painel-titulo"
@@ -210,7 +223,7 @@ export function AppointmentPanel({
               type="button"
               onClick={onClose}
               aria-label="Fechar"
-              className="p-1.5 rounded-md text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition"
+              className="p-1.5 rounded-md text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 flex items-center justify-center"
             >
               <X className="w-5 h-5" />
             </button>
@@ -352,7 +365,7 @@ export function AppointmentPanel({
                 type="button"
                 onClick={() => setShowMoreOptions((prev) => !prev)}
                 aria-expanded={showMoreOptions}
-                className="flex items-center gap-1.5 text-sm font-medium text-stone-700 hover:text-stone-900 focus:outline-none"
+                className="flex items-center gap-1.5 text-sm font-medium text-stone-700 hover:text-stone-900 rounded"
               >
                 <ChevronRight
                   className={`w-4 h-4 text-stone-500 transition-transform duration-200 ${

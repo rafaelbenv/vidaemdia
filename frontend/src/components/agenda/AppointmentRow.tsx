@@ -27,13 +27,13 @@ export function AppointmentRow({
 
   const timeClass =
     isCancelled || isPast
-      ? 'text-sm font-semibold tabular-nums text-stone-400'
+      ? 'text-sm font-semibold tabular-nums text-stone-500'
       : 'text-sm font-semibold tabular-nums text-stone-900';
 
   const titleClass = isCancelled
-    ? 'text-sm font-medium line-through text-stone-400 truncate'
+    ? 'text-sm font-medium line-through text-stone-500 truncate'
     : isPast
-    ? 'text-sm font-medium text-stone-400 truncate'
+    ? 'text-sm font-medium text-stone-500 truncate'
     : 'text-sm font-medium text-stone-900 truncate';
 
   return (
