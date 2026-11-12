@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import {
   cancelAppointment,
@@ -27,7 +28,6 @@ import {
   Calendar,
   ChatMessage,
   DispatchedMessageLog,
-  NotificationChannel,
   ProfessionalDirectoryEntry,
   Reminder,
   User,
@@ -36,9 +36,18 @@ import {
   checkIsPast,
   formatApptDateTime,
   getErrorMessageByStatus,
-  todayStr,
 } from './lib/format';
-import { getVisibleTabs, TAB_DEFINITIONS, TabId } from './lib/tabs';
+import {
+  getVisibleTabs,
+  LOGIN_PATH,
+  TAB_DEFINITIONS,
+  TAB_PATHS,
+  tabFromPath,
+  TabId,
+} from './lib/tabs';
+import { useUserMenu } from './hooks/useUserMenu';
+import { useAppointmentForm } from './hooks/useAppointmentForm';
+import { useTelegramLink } from './hooks/useTelegramLink';
 import { ConfirmDialog, ConfirmModalProps } from './components/ConfirmDialog';
 import { FeedbackBanner } from './components/FeedbackBanner';
 import { UserMenu } from './components/UserMenu';
@@ -50,43 +59,37 @@ import { AssistentePage } from './pages/AssistentePage';
 import { AuditoriaPage } from './pages/AuditoriaPage';
 
 export function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activeTab: TabId = tabFromPath(location.pathname) ?? 'agenda';
+  const setActiveTab = (tab: TabId) => navigate(TAB_PATHS[tab]);
+
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('vidaemdia_jwt'));
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<TabId>('agenda');
-  const [userMenuOpen, setUserMenuOpen] = useState<boolean>(false);
-  const userMenuRef = useRef<HTMLDivElement>(null);
+  const { userMenuOpen, setUserMenuOpen, userMenuRef } = useUserMenu();
 
-  // Fecha menu do avatar com clique fora ou tecla Esc
+  // Redirecionamento baseado na sessão e na URL
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
-        setUserMenuOpen(false);
-      }
+    const path = location.pathname;
+    if (!token) {
+      if (path !== LOGIN_PATH) navigate(LOGIN_PATH, { replace: true });
+      return;
     }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        setUserMenuOpen(false);
-      }
+    if (!user) return; // sessão ainda sendo validada: não mexe na URL (recarregar mantém a tela)
+    if (path === LOGIN_PATH || tabFromPath(path) === null) {
+      navigate(TAB_PATHS.agenda, { replace: true });
     }
-    if (userMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('keydown', handleKeyDown);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [userMenuOpen]);
+  }, [token, user, location.pathname, navigate]);
 
   // Se a aba ativa sumir ao trocar de conta, volta para "Agenda"
   useEffect(() => {
     if (user) {
       const visible = getVisibleTabs(user.role);
       if (!visible.includes(activeTab)) {
-        setActiveTab('agenda');
+        navigate(TAB_PATHS.agenda, { replace: true });
       }
     }
-  }, [user, activeTab]);
+  }, [user, activeTab, navigate]);
 
   // Navegação acessível por teclado na barra de abas (setas ← / →, Home e End)
   const handleTabKeyDown = (e: React.KeyboardEvent, currentTabId: TabId) => {
@@ -119,28 +122,15 @@ export function App() {
   };
 
   // Telegram Integration State
-  const [telegramLinked, setTelegramLinked] = useState<boolean>(false);
-  const [telegramWaiting, setTelegramWaiting] = useState<boolean>(false);
-  const pollingRef = useRef<number | null>(null);
-  const pollingTimeoutRef = useRef<number | null>(null);
-
-  const stopPolling = () => {
-    if (pollingRef.current !== null) {
-      window.clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
-    if (pollingTimeoutRef.current !== null) {
-      window.clearTimeout(pollingTimeoutRef.current);
-      pollingTimeoutRef.current = null;
-    }
-    setTelegramWaiting(false);
-  };
-
-  useEffect(() => {
-    return () => {
-      stopPolling();
-    };
-  }, []);
+  const {
+    telegramLinked,
+    setTelegramLinked,
+    telegramWaiting,
+    setTelegramWaiting,
+    pollingRef,
+    pollingTimeoutRef,
+    stopPolling,
+  } = useTelegramLink();
 
   // Login State
   const [email, setEmail] = useState('dr.joao@vidaemdia.com.br');
@@ -221,13 +211,22 @@ export function App() {
   const [healthData, setHealthData] = useState<any>(null);
 
   // Form State (Fluxo Principal - Etapa 3)
-  const [formTitle, setFormTitle] = useState('');
-  const [formDate, setFormDate] = useState(() => todayStr);
-  const [formTime, setFormTime] = useState('08:00');
-  const [formDesc, setFormDesc] = useState('');
-  const [formReminderMinutes, setFormReminderMinutes] = useState<number>(0);
-  const [formChannel, setFormChannel] = useState<NotificationChannel>('TELEGRAM');
-  const [dateError, setDateError] = useState<string | null>(null);
+  const {
+    formTitle,
+    setFormTitle,
+    formDate,
+    setFormDate,
+    formTime,
+    setFormTime,
+    formDesc,
+    setFormDesc,
+    formReminderMinutes,
+    setFormReminderMinutes,
+    formChannel,
+    setFormChannel,
+    dateError,
+    setDateError,
+  } = useAppointmentForm();
   const [feedbackBanner, setFeedbackBanner] = useState<{
     type: 'success' | 'error';
     title: string;
@@ -368,7 +367,7 @@ export function App() {
     setUser(null);
     setSelectedCalendarId('');
     setAppointments([]);
-    setActiveTab('agenda');
+    navigate(LOGIN_PATH, { replace: true });
     setUserMenuOpen(false);
   }
 

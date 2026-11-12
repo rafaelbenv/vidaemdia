@@ -40,3 +40,18 @@ export function getVisibleTabs(role?: UserRole): TabId[] {
       return ['agenda', 'chatbot'];
   }
 }
+
+export const LOGIN_PATH = '/entrar';
+export const TAB_PATHS: Record<TabId, string> = {
+  agenda: '/agenda',
+  rbac: '/agenda/compartilhar',
+  worker: '/bastidores/lembretes',
+  chatbot: '/bastidores/assistente',
+  auditoria: '/bastidores/auditoria',
+};
+export function tabFromPath(pathname: string): TabId | null {
+  const clean = pathname.replace(/\/+$/, '') || '/';
+  const entry = (Object.entries(TAB_PATHS) as [TabId, string][]).find(([, p]) => p === clean);
+  return entry ? entry[0] : null;
+}
+
