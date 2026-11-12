@@ -13,7 +13,7 @@ import { TelegramLinkService } from '../telegram/telegram-link.service';
 import { TelegramUpdate } from '../telegram/telegram.types';
 
 export interface HandleBotMessageParams {
-  channel: 'TELEGRAM' | 'WHATSAPP' | string;
+  channel: 'TELEGRAM';
   chatId: string;
   text?: string | null;
   ip?: string;
@@ -201,12 +201,9 @@ export class BotService implements OnModuleInit {
             description: `Criado via Chatbot (${channel}): "${rawText}"`,
             startTime: parsed.startTime.toISOString(),
             reminderMinutesBefore: 30,
-            reminderChannel:
-              channel === 'WHATSAPP'
-                ? NotificationChannel.WHATSAPP
-                : NotificationChannel.TELEGRAM,
+            reminderChannel: NotificationChannel.TELEGRAM,
           },
-          channel === 'WHATSAPP' ? 'WHATSAPP' : 'TELEGRAM',
+          'TELEGRAM',
           ip,
         );
 

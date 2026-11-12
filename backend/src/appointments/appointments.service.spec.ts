@@ -263,7 +263,7 @@ describe('AppointmentsService', () => {
           {
             id: 'rem-old',
             status: ReminderStatus.SENT,
-            channel: NotificationChannel.WHATSAPP,
+            channel: NotificationChannel.TELEGRAM,
             createdAt: new Date('2026-11-19T09:00:00.000Z'),
           },
         ],
@@ -280,7 +280,7 @@ describe('AppointmentsService', () => {
         data: {
           appointmentId: 'app-1',
           remindAt: new Date('2026-11-21T09:30:00.000Z'),
-          channel: NotificationChannel.WHATSAPP,
+          channel: NotificationChannel.TELEGRAM,
           status: ReminderStatus.PENDING,
         },
       });
@@ -297,7 +297,7 @@ describe('AppointmentsService', () => {
             id: 'rem-sent',
             status: ReminderStatus.SENT,
             remindAt: new Date('2026-11-20T09:30:00.000Z'),
-            channel: NotificationChannel.WHATSAPP,
+            channel: NotificationChannel.TELEGRAM,
             createdAt: new Date('2026-11-19T09:00:00.000Z'),
           },
         ],
@@ -334,7 +334,7 @@ describe('AppointmentsService', () => {
             id: 'rem-old-sent',
             status: ReminderStatus.SENT,
             remindAt: pastRemindAt,
-            channel: NotificationChannel.WHATSAPP,
+            channel: NotificationChannel.TELEGRAM,
             createdAt: new Date(pastRemindAt.getTime() - 1000),
           },
         ],
@@ -351,7 +351,7 @@ describe('AppointmentsService', () => {
         data: {
           appointmentId: 'app-1',
           remindAt: expectedRemindAt,
-          channel: NotificationChannel.WHATSAPP,
+          channel: NotificationChannel.TELEGRAM,
           status: ReminderStatus.PENDING,
         },
       });
@@ -372,7 +372,7 @@ describe('AppointmentsService', () => {
             id: 'rem-sent',
             status: ReminderStatus.SENT,
             remindAt: pastRemindAt,
-            channel: NotificationChannel.WHATSAPP,
+            channel: NotificationChannel.TELEGRAM,
             createdAt: new Date(pastRemindAt.getTime() - 1000),
           },
         ],
@@ -407,7 +407,7 @@ describe('AppointmentsService', () => {
 
       const dto: UpdateAppointmentDto = {
         startTime: '2026-11-21T10:00:00.000Z',
-        reminderChannel: NotificationChannel.WHATSAPP,
+        reminderChannel: NotificationChannel.TELEGRAM,
       };
 
       await service.update('user-1', 'USER', 'app-1', dto);
@@ -416,7 +416,7 @@ describe('AppointmentsService', () => {
         where: { appointmentId: 'app-1', status: ReminderStatus.PENDING },
         data: {
           remindAt: new Date('2026-11-21T09:30:00.000Z'),
-          channel: NotificationChannel.WHATSAPP,
+          channel: NotificationChannel.TELEGRAM,
         },
       });
     });

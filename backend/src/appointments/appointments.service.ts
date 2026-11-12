@@ -25,7 +25,7 @@ export class AppointmentsService {
         createdBy: { select: { id: true, name: true, email: true, role: true } },
         reminders: { orderBy: { createdAt: 'desc' } },
         calendar: {
-          include: { owner: { select: { id: true, name: true, phoneWhatsapp: true, telegramChatId: true } } },
+          include: { owner: { select: { id: true, name: true, telegramChatId: true } } },
         },
       },
       orderBy: { startTime: 'asc' },
@@ -48,7 +48,7 @@ export class AppointmentsService {
     userId: string,
     userRole: string,
     dto: CreateAppointmentDto,
-    createdVia: 'WEB' | 'WHATSAPP' | 'TELEGRAM' = 'WEB',
+    createdVia: 'WEB' | 'TELEGRAM' = 'WEB',
     ipAddress?: string,
   ) {
     // Dupla checagem RBAC para criação na agenda alvo
@@ -96,7 +96,7 @@ export class AppointmentsService {
     const reminderMinutesBefore = dto.reminderMinutesBefore ?? 30;
     const remindAt = this.computeRemindAt(startTime, reminderMinutesBefore);
 
-    const channel = dto.reminderChannel || NotificationChannel.WHATSAPP;
+    const channel = dto.reminderChannel || NotificationChannel.TELEGRAM;
 
     const data: any = {
       calendarId: dto.calendarId,

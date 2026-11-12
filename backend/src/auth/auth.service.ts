@@ -57,7 +57,6 @@ export class AuthService {
         name: user.name,
         email: user.email,
         role: user.role,
-        phoneWhatsapp: user.phoneWhatsapp,
         telegramChatId: user.telegramChatId,
         preferredChannel: user.preferredChannel,
       },
@@ -80,7 +79,6 @@ export class AuthService {
         email,
         passwordHash,
         role,
-        phoneWhatsapp: dto.phoneWhatsapp,
         preferredChannel: dto.preferredChannel,
       },
     });
@@ -116,7 +114,6 @@ export class AuthService {
         name: true,
         email: true,
         role: true,
-        phoneWhatsapp: true,
         telegramChatId: true,
         preferredChannel: true,
         createdAt: true,

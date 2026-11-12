@@ -36,7 +36,7 @@ export class NotificationWorker {
    * 1. Consulta PostgreSQL: compromissos com lembrete pendente dentro da janela
    * 2. Existe lembrete pendente? Se NÃO -> aguarda próximo ciclo
    * 3. Se SIM -> Monta mensagem de lembrete (Título · Data · Horário)
-   * 4. Envia requisição para WhatsApp Business API / Telegram Bot API
+   * 4. Envia requisição para Telegram Bot API
    * 5. Envio bem-sucedido?
    *    - SIM: Atualiza status do lembrete para ENVIADO (SENT) no PostgreSQL
    *    - NÃO: Registra erro -> agenda nova tentativa (máx. 3 tentativas)
@@ -160,7 +160,6 @@ export class NotificationWorker {
             appointmentId: appt.id,
             channel: reminder.channel,
             recipientName: owner.name,
-            phoneWhatsapp: owner.phoneWhatsapp,
             telegramChatId: owner.telegramChatId,
             messageText,
           });

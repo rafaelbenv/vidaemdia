@@ -25,9 +25,9 @@ async function bootstrap() {
   );
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('VidaEmDia API — Agenda Inteligente & Chatbot WhatsApp/Telegram')
+    .setTitle('VidaEmDia API — Agenda com lembretes no Telegram')
     .setDescription(
-      'API RESTful para o Fluxo Principal (Cadastro de Compromissos), Fluxo RBAC (Secretária ↔ Profissional), Worker de Notificações (WhatsApp/Telegram com Retry 3x), Webhook Chatbot, Auditoria e Monitoramento.',
+      'API RESTful para o Fluxo Principal (Cadastro de Compromissos), Fluxo RBAC (Secretária ↔ Profissional), Worker de Notificações (Telegram com Retry 3x), Webhook Chatbot, Auditoria e Monitoramento.',
     )
     .setVersion('1.0.0')
     .addBearerAuth()

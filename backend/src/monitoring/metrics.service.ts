@@ -4,9 +4,7 @@ import { Injectable } from '@nestjs/common';
 export class MetricsService {
   private readonly counters = {
     appointmentsCreatedWeb: 0,
-    appointmentsCreatedWhatsapp: 0,
     appointmentsCreatedTelegram: 0,
-    remindersSentWhatsapp: 0,
     remindersSentTelegram: 0,
     remindersFailed: 0,
     rbacAccessDenied: 0,
@@ -15,15 +13,13 @@ export class MetricsService {
     telegramApiErrors: 0,
   };
 
-  incrementAppointmentCreated(source: 'WEB' | 'WHATSAPP' | 'TELEGRAM') {
-    if (source === 'WHATSAPP') this.counters.appointmentsCreatedWhatsapp++;
-    else if (source === 'TELEGRAM') this.counters.appointmentsCreatedTelegram++;
+  incrementAppointmentCreated(source: 'WEB' | 'TELEGRAM') {
+    if (source === 'TELEGRAM') this.counters.appointmentsCreatedTelegram++;
     else this.counters.appointmentsCreatedWeb++;
   }
 
-  incrementReminderSent(channel: string) {
-    if (channel === 'TELEGRAM') this.counters.remindersSentTelegram++;
-    else this.counters.remindersSentWhatsapp++;
+  incrementReminderSent(_channel?: string) {
+    this.counters.remindersSentTelegram++;
   }
 
   incrementReminderFailed(_channel: string) {
@@ -55,12 +51,10 @@ export class MetricsService {
       '# HELP vidaemdia_appointments_created_total Total de compromissos criados por canal',
       '# TYPE vidaemdia_appointments_created_total counter',
       `vidaemdia_appointments_created_total{source="WEB"} ${this.counters.appointmentsCreatedWeb}`,
-      `vidaemdia_appointments_created_total{source="WHATSAPP"} ${this.counters.appointmentsCreatedWhatsapp}`,
       `vidaemdia_appointments_created_total{source="TELEGRAM"} ${this.counters.appointmentsCreatedTelegram}`,
       '',
       '# HELP vidaemdia_reminders_sent_total Total de lembretes enviados com sucesso pelo Worker',
       '# TYPE vidaemdia_reminders_sent_total counter',
-      `vidaemdia_reminders_sent_total{channel="WHATSAPP"} ${this.counters.remindersSentWhatsapp}`,
       `vidaemdia_reminders_sent_total{channel="TELEGRAM"} ${this.counters.remindersSentTelegram}`,
       '',
       '# HELP vidaemdia_reminders_failed_total Total de falhas/retries no envio de lembretes',

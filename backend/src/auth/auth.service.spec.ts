@@ -58,7 +58,6 @@ describe('AuthService', () => {
         email: 'dr.joao@vidaemdia.com.br',
         passwordHash: validPasswordHash,
         role: UserRole.PROFESSIONAL,
-        phoneWhatsapp: null,
         telegramChatId: null,
         preferredChannel: 'TELEGRAM',
       };
@@ -93,7 +92,6 @@ describe('AuthService', () => {
         email: 'dr.joao@vidaemdia.com.br',
         passwordHash: validPasswordHash,
         role: UserRole.PROFESSIONAL,
-        phoneWhatsapp: null,
         telegramChatId: null,
         preferredChannel: 'TELEGRAM',
       };
@@ -129,7 +127,6 @@ describe('AuthService', () => {
         email: 'dr.joao@vidaemdia.com.br',
         passwordHash: validPasswordHash,
         role: UserRole.PROFESSIONAL,
-        phoneWhatsapp: null,
         telegramChatId: null,
         preferredChannel: 'TELEGRAM',
       };
@@ -155,7 +152,6 @@ describe('AuthService', () => {
         email: 'ana@x.com',
         passwordHash: validPasswordHash,
         role: UserRole.USER,
-        phoneWhatsapp: null,
         telegramChatId: null,
         preferredChannel: 'TELEGRAM',
       };

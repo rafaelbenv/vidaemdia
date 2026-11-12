@@ -1,5 +1,5 @@
 export type UserRole = 'USER' | 'PROFESSIONAL' | 'SECRETARY' | 'ADMIN';
-export type NotificationChannel = 'WHATSAPP' | 'TELEGRAM' | 'BOTH';
+export type NotificationChannel = 'TELEGRAM';
 export type CalendarType = 'PERSONAL' | 'PROFESSIONAL';
 export type AppointmentStatus = 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
 export type ReminderStatus = 'PENDING' | 'PROCESSING' | 'SENT' | 'FAILED';
@@ -9,7 +9,6 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
-  phoneWhatsapp?: string;
   telegramChatId?: string;
   telegramLinked?: boolean;
   preferredChannel: NotificationChannel;
@@ -82,7 +81,7 @@ export interface Appointment {
   endTime: string;
   reminderMinutesBefore: number;
   status: AppointmentStatus;
-  createdVia: 'WEB' | 'WHATSAPP' | 'TELEGRAM';
+  createdVia: 'WEB' | 'TELEGRAM';
   createdBy?: User;
   calendar?: {
     id: string;
@@ -150,7 +149,7 @@ export interface AuditLogEntry {
 
 export interface DispatchedMessageLog {
   id: string;
-  channel: 'WHATSAPP' | 'TELEGRAM';
+  channel: 'TELEGRAM';
   recipient: string;
   recipientName: string;
   message: string;
@@ -198,9 +197,7 @@ export interface HealthDatabaseStats {
 
 export interface HealthMetrics {
   appointmentsCreatedWeb?: number;
-  appointmentsCreatedWhatsapp?: number;
   appointmentsCreatedTelegram?: number;
-  remindersSentWhatsapp?: number;
   remindersSentTelegram?: number;
   remindersFailed?: number;
   rbacAccessDenied?: number;

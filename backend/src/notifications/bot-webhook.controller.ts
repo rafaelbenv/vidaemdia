@@ -17,7 +17,7 @@ export class SimulateBotMessageDto {
   @IsNotEmpty()
   text: string;
 
-  @ApiPropertyOptional({ enum: ['WHATSAPP', 'TELEGRAM'], default: 'TELEGRAM' })
+  @ApiPropertyOptional({ enum: ['TELEGRAM'], default: 'TELEGRAM' })
   @IsOptional()
   @IsString()
   channel?: string;
@@ -29,7 +29,7 @@ export class SimulateBotMessageDto {
 }
 
 export class SimulateFailureDto {
-  @ApiPropertyOptional({ default: 1, description: 'Quantidade de próximas requisições ao WhatsApp/Telegram que devem falhar para testar o Retry (máx. 3)' })
+  @ApiPropertyOptional({ default: 1, description: 'Quantidade de próximas requisições ao Telegram que devem falhar para testar o Retry (máx. 3)' })
   @IsOptional()
   @IsInt()
   @Min(0)
@@ -37,7 +37,7 @@ export class SimulateFailureDto {
   failCount?: number;
 }
 
-@ApiTags('Notificações (Worker WhatsApp/Telegram) & Chatbot Webhook')
+@ApiTags('Notificações (Worker Telegram) & Chatbot Webhook')
 @Controller('notificacoes')
 export class BotWebhookController {
   constructor(
@@ -50,7 +50,7 @@ export class BotWebhookController {
   @Get('status')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Retorna status do Worker de Notificações, fila de lembretes e mensagens disparadas no WhatsApp/Telegram' })
+  @ApiOperation({ summary: 'Retorna status do Worker de Notificações, fila de lembretes e mensagens disparadas no Telegram' })
   async getStatus(@Req() req: any) {
     const userId = req.user?.sub || req.user?.id;
     const role = req.user?.role;
@@ -134,7 +134,7 @@ export class BotWebhookController {
   }
 
   /**
-   * Simulador do chatbot (WhatsApp / Telegram)
+   * Simulador do chatbot (Telegram)
    * Recebe { text }, usa o telegramChatId do usuário autenticado (ou sim:userId se não vinculado) e retorna { botReply }
    */
   @Post('bot/webhook')
@@ -154,7 +154,7 @@ export class BotWebhookController {
     const chatId = telegramChatId ? String(telegramChatId) : `sim:${userId}`;
 
     const botReply = await this.botService.handleMessage({
-      channel: (dto.channel as any) || 'TELEGRAM',
+      channel: 'TELEGRAM',
       chatId,
       text: dto.text,
       ip: req.ip,

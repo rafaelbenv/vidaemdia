@@ -28,11 +28,6 @@ export class RegisterDto {
   @MinLength(6, { message: 'A senha deve ter no mínimo 6 caracteres' })
   password: string;
 
-  @ApiPropertyOptional({ example: '5511999991111' })
-  @IsOptional()
-  @IsString()
-  phoneWhatsapp?: string;
-
   @ApiPropertyOptional({ enum: NotificationChannel, default: NotificationChannel.TELEGRAM })
   @IsOptional()
   @IsEnum(NotificationChannel)

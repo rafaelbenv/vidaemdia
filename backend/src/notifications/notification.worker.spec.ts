@@ -34,7 +34,6 @@ describe('NotificationWorker', () => {
         owner: {
           id: 'user-1',
           name: 'Paciente Teste',
-          phoneWhatsapp: '+5511999999999',
           telegramChatId: '123456789',
         },
       },

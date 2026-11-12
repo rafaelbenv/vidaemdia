@@ -1,6 +1,6 @@
 # VidaEmDia — Agenda Pessoal/Profissional & Chatbot Telegram
 
-Sistema completo de gerenciamento de agendas pessoais e profissionais com controle de acesso **RBAC** (delegação entre Profissional e Secretária), **Worker de Notificações** via **Telegram Bot API** (canal ativo padrão, com política de Retry de até 3 tentativas; WhatsApp desabilitado por `WHATSAPP_ENABLED=false`), **Webhook e Polling de Chatbot**, **Vínculo Seguro de Contas**, **Logs de Auditoria**, **Monitoramento (Prometheus + Grafana)** e procedimentos automatizados de **Backup e Recuperação (PostgreSQL)**.
+Sistema completo de gerenciamento de agendas pessoais e profissionais com controle de acesso **RBAC** (delegação entre Profissional e Secretária), **Worker de Notificações** via **Telegram Bot API** (canal ativo padrão, com política de Retry de até 3 tentativas; o canal WhatsApp original foi descontinuado e substituído integralmente pelo Telegram), **Webhook e Polling de Chatbot**, **Vínculo Seguro de Contas**, **Logs de Auditoria**, **Monitoramento (Prometheus + Grafana)** e procedimentos automatizados de **Backup e Recuperação (PostgreSQL)**.
 
 ---
 
@@ -25,7 +25,6 @@ O projeto segue fielmente o diagrama arquitetural `VidaEmDia_Fluxo.drawio.html`:
    * Um **Worker / Scheduler** (`NotificationWorker`) executa periodicamente de forma independente do fluxo principal.
    * Consulta no PostgreSQL compromissos agendados cujo lembrete esteja `PENDING` dentro da janela de disparo.
    * Monta a mensagem padronizada (*"🔔 <b>Lembrete VidaEmDia</b>: Consulta médica hoje às 08:00."*) e envia para a **Telegram Bot API**.
-   * O canal WhatsApp encontra-se desligado por padrão (`WHATSAPP_ENABLED=false`).
    * **Envio bem-sucedido:** Atualiza o status do lembrete para `SENT` (`ENVIADO`) no PostgreSQL.
    * **Falha no envio:** Registra o erro e agenda nova tentativa com *backoff* (**máx. 3 tentativas**).
 
@@ -48,7 +47,7 @@ Trabalho Devops/
 │   │   ├── auth/                   # Login, Registro, Estratégia JWT e Guards RBAC
 │   │   ├── calendars/              # Agendas Pessoal/Profissional e Delegação RBAC (Dupla Checagem)
 │   │   ├── appointments/           # CRUD de Compromissos + Prevenção de Conflitos
-│   │   ├── notifications/          # Worker Cron, Provedor Telegram/WhatsApp e BotService (Parser PLN)
+│   │   ├── notifications/          # Worker Cron, Provedor Telegram e BotService (Parser PLN)
 │   │   ├── telegram/               # TelegramService (Mock/Polling/Webhook), LinkService e Webhook Controller
 │   │   ├── audit/                  # Gravação e consulta de Logs de Auditoria
 │   │   └── monitoring/             # Healthcheck (/health) e Métricas Prometheus (/metrics)
@@ -90,10 +89,6 @@ TELEGRAM_BOT_TOKEN="seu_token_aqui"       # Fornecido pelo BotFather
 TELEGRAM_BOT_USERNAME="seu_bot_username"  # Sem o caractere @
 TELEGRAM_WEBHOOK_URL="https://seu-dominio.com/telegram/webhook"
 TELEGRAM_WEBHOOK_SECRET="segredo_aleatorio_seguro"
-
-# WhatsApp mantido desabilitado
-WHATSAPP_ENABLED=false
-WHATSAPP_MOCK_MODE=false
 ```
 
 ### 3.3. Modo Polling Local

@@ -16,9 +16,7 @@ enum UserRole {
 }
 
 enum NotificationChannel {
-  WHATSAPP
   TELEGRAM
-  BOTH
 }
 
 enum CalendarType {
@@ -44,7 +42,6 @@ model User {
   name             String
   email            String              @unique
   passwordHash     String              @map("password_hash")
-  phoneWhatsapp    String?             @map("phone_whatsapp")
   telegramChatId   String?             @unique @map("telegram_chat_id")
   role             UserRole            @default(USER)
   preferredChannel NotificationChannel @default(TELEGRAM) @map("preferred_channel")
@@ -106,7 +103,7 @@ model Appointment {
   endTime           DateTime          @map("end_time")
   reminderMinutesBefore Int           @default(30) @map("reminder_minutes_before")
   status            AppointmentStatus @default(SCHEDULED)
-  createdVia        String            @default("WEB") @map("created_via") // WEB, WHATSAPP, TELEGRAM
+  createdVia        String            @default("WEB") @map("created_via") // WEB, TELEGRAM
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
 

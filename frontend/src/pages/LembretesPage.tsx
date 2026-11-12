@@ -113,7 +113,7 @@ export function LembretesPage({
                         {rem.appointment?.title || 'Compromisso'}
                       </div>
                       <div className="text-stone-500 text-xs">
-                        Agenda: {rem.appointment?.calendar?.name} · Canal: <b>{rem.channel === 'WHATSAPP' || rem.channel === 'BOTH' ? 'TELEGRAM' : rem.channel}</b> ·
+                        Agenda: {rem.appointment?.calendar?.name} · Canal: <b>{rem.channel}</b> ·
                         Tentativas: <b>{rem.retryCount}/{workerStats?.maxRetries ?? 3}</b>
                       </div>
                       {rem.lastError && (
