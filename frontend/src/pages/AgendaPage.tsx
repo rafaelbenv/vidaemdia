@@ -8,12 +8,15 @@ import {
 } from '../types';
 import {
   addDays,
+  addMonths,
   formatLongDate,
+  formatMonthYear,
   fromDateKey,
   toDateKey,
 } from '../lib/dates';
 import { WeekStrip } from '../components/agenda/WeekStrip';
 import { DayList } from '../components/agenda/DayList';
+import { MonthGrid } from '../components/agenda/MonthGrid';
 
 export interface AgendaPageProps {
   allAccessibleCalendars: Calendar[];
@@ -56,12 +59,70 @@ export function AgendaPage({
   }, []);
 
   const diaParam = searchParams.get('dia');
+  const visaoParam = searchParams.get('visao');
+  const isMonthView = visaoParam === 'mes';
+
   const selectedDate = useMemo(() => {
     return diaParam ? fromDateKey(diaParam) : fromDateKey(toDateKey(new Date()));
   }, [diaParam]);
 
   const changeDate = (d: Date) => {
     setSearchParams({ dia: toDateKey(d) }, { replace: true });
+  };
+
+  const handleViewChange = (newView: 'dia' | 'mes') => {
+    if (newView === 'mes') {
+      setSearchParams(
+        { visao: 'mes', dia: toDateKey(selectedDate) },
+        { replace: true },
+      );
+    } else {
+      setSearchParams({ dia: toDateKey(selectedDate) }, { replace: true });
+    }
+  };
+
+  const handleSelectMonthDay = (d: Date) => {
+    const isSm =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(min-width: 640px)').matches;
+    if (isSm) {
+      setSearchParams({ dia: toDateKey(d) }, { replace: true });
+    } else {
+      setSearchParams({ visao: 'mes', dia: toDateKey(d) }, { replace: true });
+    }
+  };
+
+  const handleToday = () => {
+    if (isMonthView) {
+      setSearchParams(
+        { visao: 'mes', dia: toDateKey(new Date()) },
+        { replace: true },
+      );
+    } else {
+      changeDate(new Date());
+    }
+  };
+
+  const handlePrev = () => {
+    if (isMonthView) {
+      setSearchParams(
+        { visao: 'mes', dia: toDateKey(addMonths(selectedDate, -1)) },
+        { replace: true },
+      );
+    } else {
+      changeDate(addDays(selectedDate, -7));
+    }
+  };
+
+  const handleNext = () => {
+    if (isMonthView) {
+      setSearchParams(
+        { visao: 'mes', dia: toDateKey(addMonths(selectedDate, 1)) },
+        { replace: true },
+      );
+    } else {
+      changeDate(addDays(selectedDate, 7));
+    }
   };
 
   const handleOpenNew = () => {
@@ -94,6 +155,20 @@ export function AgendaPage({
       }
     }
     return map;
+  }, [appointments]);
+
+  // failed = dias com algum compromisso ativo cujo reminders[0].status === 'FAILED'
+  const failed = useMemo(() => {
+    const set = new Set<string>();
+    for (const appt of appointments) {
+      if (
+        appt.status !== 'CANCELLED' &&
+        appt.reminders?.[0]?.status === 'FAILED'
+      ) {
+        set.add(toDateKey(new Date(appt.startTime)));
+      }
+    }
+    return set;
   }, [appointments]);
 
   // Compromissos do dia selecionado
@@ -148,32 +223,66 @@ export function AgendaPage({
         </div>
       </div>
 
-      {/* 2. Cabeçalho do dia */}
+      {/* 2. Cabeçalho da data e controles */}
       <div className="flex flex-wrap items-center justify-between gap-3 mt-6">
-        <h1 className="text-xl font-semibold text-stone-900">
-          {formatLongDate(selectedDate)}
-        </h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold text-stone-900">
+            {isMonthView ? formatMonthYear(selectedDate) : formatLongDate(selectedDate)}
+          </h1>
+
+          {/* Seletor segmentado "Dia | Mês" */}
+          <div
+            role="group"
+            aria-label="Visão"
+            className="bg-stone-100 rounded-md p-0.5 inline-flex"
+          >
+            <button
+              type="button"
+              onClick={() => handleViewChange('dia')}
+              aria-pressed={!isMonthView}
+              className={`px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition ${
+                !isMonthView
+                  ? 'bg-white shadow-sm text-stone-900'
+                  : 'text-stone-600 hover:text-stone-900'
+              }`}
+            >
+              Dia
+            </button>
+            <button
+              type="button"
+              onClick={() => handleViewChange('mes')}
+              aria-pressed={isMonthView}
+              className={`px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition ${
+                isMonthView
+                  ? 'bg-white shadow-sm text-stone-900'
+                  : 'text-stone-600 hover:text-stone-900'
+              }`}
+            >
+              Mês
+            </button>
+          </div>
+        </div>
 
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => changeDate(new Date())}
+            onClick={handleToday}
             className="border border-stone-300 rounded-md px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 transition"
           >
             Hoje
           </button>
           <button
             type="button"
-            onClick={() => changeDate(addDays(selectedDate, -7))}
-            aria-label="Semana anterior"
+            onClick={handlePrev}
+            aria-label={isMonthView ? 'Mês anterior' : 'Semana anterior'}
             className="p-2 border border-stone-300 rounded-md hover:bg-stone-50 text-stone-600 transition flex items-center justify-center"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button
             type="button"
-            onClick={() => changeDate(addDays(selectedDate, 7))}
-            aria-label="Próxima semana"
+            onClick={handleNext}
+            aria-label={isMonthView ? 'Próximo mês' : 'Próxima semana'}
             className="p-2 border border-stone-300 rounded-md hover:bg-stone-50 text-stone-600 transition flex items-center justify-center"
           >
             <ChevronRight className="w-4 h-4" />
@@ -190,38 +299,81 @@ export function AgendaPage({
         </div>
       </div>
 
-      {/* 3. Tira da semana */}
-      <div className="mt-4">
-        <WeekStrip
-          selected={selectedDate}
-          counts={counts}
-          onSelect={changeDate}
-        />
-      </div>
-
-      {/* 4. Lista do dia */}
-      <div className="bg-white rounded-lg border border-stone-200 px-4 mt-4">
-        {loadingAppointments ? (
-          <div className="py-6 text-center text-sm text-stone-500">
-            Carregando…
-          </div>
-        ) : (
-          <DayList
-            day={selectedDate}
-            appointments={dayAppointments}
-            now={now}
-            ownerId={activeCalendar?.ownerId ?? user.id}
-            ownerTelegramLinked={ownerTelegramLinked}
-            isOwnCalendar={isOwnCalendar}
-            canCreate={canCreate}
-            onConnectTelegram={onConnectTelegram}
-            onOpen={onOpenAppointment}
-            onNew={handleOpenNew}
+      {/* 3. Conteúdo principal: Mês ou Dia */}
+      {isMonthView ? (
+        <div className="mt-4">
+          <MonthGrid
+            month={selectedDate}
+            selected={selectedDate}
+            today={now}
+            counts={counts}
+            failed={failed}
+            onSelect={handleSelectMonthDay}
           />
-        )}
-      </div>
 
-      {/* 5. Celular: botão flutuante */}
+          {/* Celular: lista do dia abaixo da grade */}
+          <div className="sm:hidden mt-4">
+            <h2 className="text-sm font-semibold mt-4 text-stone-900">
+              {formatLongDate(selectedDate)}
+            </h2>
+            <div className="bg-white rounded-lg border border-stone-200 px-4 mt-2">
+              {loadingAppointments ? (
+                <div className="py-6 text-center text-sm text-stone-500">
+                  Carregando…
+                </div>
+              ) : (
+                <DayList
+                  day={selectedDate}
+                  appointments={dayAppointments}
+                  now={now}
+                  ownerId={activeCalendar?.ownerId ?? user.id}
+                  ownerTelegramLinked={ownerTelegramLinked}
+                  isOwnCalendar={isOwnCalendar}
+                  canCreate={canCreate}
+                  onConnectTelegram={onConnectTelegram}
+                  onOpen={onOpenAppointment}
+                  onNew={handleOpenNew}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Tira da semana */}
+          <div className="mt-4">
+            <WeekStrip
+              selected={selectedDate}
+              counts={counts}
+              onSelect={changeDate}
+            />
+          </div>
+
+          {/* Lista do dia */}
+          <div className="bg-white rounded-lg border border-stone-200 px-4 mt-4">
+            {loadingAppointments ? (
+              <div className="py-6 text-center text-sm text-stone-500">
+                Carregando…
+              </div>
+            ) : (
+              <DayList
+                day={selectedDate}
+                appointments={dayAppointments}
+                now={now}
+                ownerId={activeCalendar?.ownerId ?? user.id}
+                ownerTelegramLinked={ownerTelegramLinked}
+                isOwnCalendar={isOwnCalendar}
+                canCreate={canCreate}
+                onConnectTelegram={onConnectTelegram}
+                onOpen={onOpenAppointment}
+                onNew={handleOpenNew}
+              />
+            )}
+          </div>
+        </>
+      )}
+
+      {/* 4. Celular: botão flutuante */}
       {canCreate && (
         <button
           type="button"

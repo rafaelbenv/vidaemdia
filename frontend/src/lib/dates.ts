@@ -107,3 +107,66 @@ export function formatDayMonth(iso: string | Date): string {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   return `${day}/${month}`;
 }
+
+/**
+ * Retorna o primeiro dia do mês de d, às 00:00 local.
+ */
+export function startOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+}
+
+/**
+ * Adiciona n meses a uma data, retornando o dia 1 do mês resultante às 00:00 local.
+ */
+export function addMonths(d: Date, n: number): Date {
+  return new Date(d.getFullYear(), d.getMonth() + n, 1, 0, 0, 0, 0);
+}
+
+/**
+ * Formata mês e ano: "Novembro de 2026".
+ * Primeira letra maiúscula.
+ */
+export function formatMonthYear(d: Date): string {
+  if (isNaN(d.getTime())) return '';
+  const formatter = new Intl.DateTimeFormat('pt-BR', {
+    month: 'long',
+    year: 'numeric',
+  });
+  const formatted = formatter.format(d);
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
+/**
+ * Retorna array de células da grade (segunda a domingo) com Date | null para os
+ * vazios antes do dia 1 e depois do último dia, completando semanas inteiras.
+ */
+export function monthGridDays(d: Date): (Date | null)[] {
+  const year = d.getFullYear();
+  const month = d.getMonth();
+  const firstDay = new Date(year, month, 1, 0, 0, 0, 0);
+  const totalDays = new Date(year, month + 1, 0).getDate();
+
+  const firstDayOfWeek = firstDay.getDay(); // 0 = Domingo, 1 = Segunda, ...
+  const prefixCount = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+
+  const cells: (Date | null)[] = [];
+
+  for (let i = 0; i < prefixCount; i++) {
+    cells.push(null);
+  }
+
+  for (let day = 1; day <= totalDays; day++) {
+    cells.push(new Date(year, month, day, 0, 0, 0, 0));
+  }
+
+  const remainder = cells.length % 7;
+  if (remainder !== 0) {
+    const suffixCount = 7 - remainder;
+    for (let i = 0; i < suffixCount; i++) {
+      cells.push(null);
+    }
+  }
+
+  return cells;
+}
+
