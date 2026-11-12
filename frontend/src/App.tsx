@@ -241,7 +241,7 @@ export function App() {
 
   useEffect(() => {
     if (token) {
-      loadInitialData(token);
+      loadSession(token);
     }
   }, [token]);
 
@@ -251,28 +251,24 @@ export function App() {
     }
   }, [selectedCalendarId, token]);
 
-  async function loadInitialData(jwt: string) {
+  useEffect(() => {
+    if (user && token && section !== null) {
+      loadBastidoresData(token);
+    }
+  }, [user?.id, section, token]);
+
+  async function loadSession(jwt: string) {
     try {
       setInitialLoadError(null);
       setLoading(true);
-      const [me, calData, profs, audits, notifStatus, health] = await Promise.all([
+      const [me, calData] = await Promise.all([
         getMe(jwt),
         getCalendars(jwt),
-        getProfessionals(jwt),
-        getAuditLogs(jwt),
-        getNotificationsStatus(jwt),
-        getHealth(jwt),
       ]);
 
       setUser(me);
       setOwnedCalendars(calData.owned);
       setDelegatedCalendars(calData.delegated);
-      setProfessionals(profs);
-      setAuditLogs(audits);
-      setWorkerStats(notifStatus.worker);
-      setRemindersQueue(notifStatus.reminders);
-      setDispatchedMessages(notifStatus.dispatchedMessages);
-      setHealthData(health);
 
       let isTgLinked = Boolean(me.telegramLinked);
       try {
@@ -303,6 +299,33 @@ export function App() {
       }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadBastidoresData(jwt: string) {
+    try {
+      const [profs, audits, notifStatus, health] = await Promise.all([
+        getProfessionals(jwt),
+        getAuditLogs(jwt),
+        getNotificationsStatus(jwt),
+        getHealth(jwt),
+      ]);
+
+      setProfessionals(profs);
+      setAuditLogs(audits);
+      setWorkerStats(notifStatus.worker);
+      setRemindersQueue(notifStatus.reminders);
+      setDispatchedMessages(notifStatus.dispatchedMessages);
+      setHealthData(health);
+    } catch (err: unknown) {
+      const status = errorStatus(err);
+      if (status !== 401) {
+        setFeedbackBanner({
+          type: 'error',
+          title: 'Não foi possível carregar os dados técnicos.',
+          detail: getErrorMessageByStatus(status),
+        });
+      }
     }
   }
 
@@ -392,7 +415,7 @@ export function App() {
               type: 'success',
               title: 'Telegram conectado com sucesso!',
             });
-            await loadInitialData(token);
+            await loadSession(token);
           }
         } catch {
           // Ignora erros transitórios no polling
@@ -432,7 +455,7 @@ export function App() {
         type: 'success',
         title: 'Telegram desconectado com sucesso!',
       });
-      await loadInitialData(token);
+      await loadSession(token);
     } catch (err: unknown) {
       const status = errorStatus(err) || 500;
       setFeedbackBanner({
@@ -483,7 +506,9 @@ export function App() {
       });
 
       await loadAppointments(selectedCalendarId);
-      await loadInitialData(token);
+      if (section !== null) {
+        await loadBastidoresData(token);
+      }
     } catch (err: unknown) {
       const status = errorStatus(err);
       setFeedbackBanner({
@@ -491,10 +516,6 @@ export function App() {
         title: getErrorMessageByStatus(status),
         detail: `${status || 400} — ${errorMessage(err)}`,
       });
-      if (token) {
-        const audits = await getAuditLogs(token);
-        setAuditLogs(audits);
-      }
     } finally {
       setSubmittingKey('saveAppt', false);
     }
@@ -514,8 +535,12 @@ export function App() {
         title: 'Compromisso cancelado com sucesso.',
         detail: '200 OK — log de auditoria gravado',
       });
-      await loadAppointments(selectedCalendarId);
-      await loadInitialData(token);
+      if (selectedCalendarId) {
+        await loadAppointments(selectedCalendarId);
+      }
+      if (section !== null) {
+        await loadBastidoresData(token);
+      }
     } catch (err: unknown) {
       const status = errorStatus(err);
       setFeedbackBanner({
@@ -549,8 +574,10 @@ export function App() {
         detail: `${status} — ${errorMessage(err, '403 Acesso negado: Secretária não tem autorização para esta agenda.')}`,
       });
       // Atualiza logs de auditoria para mostrar o bloqueio 403 gravado
-      const audits = await getAuditLogs(token);
-      setAuditLogs(audits);
+      if (section !== null) {
+        const audits = await getAuditLogs(token);
+        setAuditLogs(audits);
+      }
     }
   }
 
@@ -577,7 +604,7 @@ export function App() {
         title: `Permissão concedida para ${secretaryEmailToGrant}!`,
         detail: '200 OK — Permissão RBAC concedida',
       });
-      await loadInitialData(token);
+      await loadSession(token);
     } catch (err: unknown) {
       const status = errorStatus(err);
       setFeedbackBanner({
@@ -601,7 +628,10 @@ export function App() {
         title: 'Ciclo de notificações executado com sucesso.',
         detail: `Worker Executado: ${res.message}`,
       });
-      await loadInitialData(token);
+      await loadBastidoresData(token);
+      if (selectedCalendarId) {
+        await loadAppointments(selectedCalendarId);
+      }
     } catch (err: unknown) {
       const status = errorStatus(err);
       setFeedbackBanner({
@@ -623,6 +653,10 @@ export function App() {
         title: 'Simulação de falha ativada! O próximo envio ao Telegram falhará.',
         detail: 'Fila de Retry: máx. 3 tentativas no PostgreSQL',
       });
+      await loadBastidoresData(token);
+      if (selectedCalendarId) {
+        await loadAppointments(selectedCalendarId);
+      }
     } catch (err: unknown) {
       const status = errorStatus(err);
       setFeedbackBanner({
@@ -662,8 +696,12 @@ export function App() {
       ]);
 
       if (token) {
-        await loadInitialData(token);
-        if (selectedCalendarId) await loadAppointments(selectedCalendarId);
+        if (selectedCalendarId) {
+          await loadAppointments(selectedCalendarId);
+        }
+        if (section !== null) {
+          await loadBastidoresData(token);
+        }
       }
     } catch (err: unknown) {
       setChatHistory((prev) => [
@@ -702,7 +740,7 @@ export function App() {
         <SessionLoadError
           message={initialLoadError}
           retrying={loading}
-          onRetry={() => loadInitialData(token)}
+          onRetry={() => loadSession(token)}
           onLogout={handleLogout}
         />
       );
