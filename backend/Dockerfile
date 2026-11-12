@@ -28,5 +28,5 @@ COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npm run start:prod"]
+CMD ["sh", "-c", "sh prisma/migrate.sh && npm run start:prod"]
 

@@ -160,7 +160,7 @@ Para receber os updates via webhook em produção ou com ferramenta de túnel:
    cd backend
    npm install
    npx prisma generate
-   npx prisma db push
+   npm run prisma:migrate
    npm run prisma:seed
    npm run start:dev
    ```
@@ -174,7 +174,17 @@ Para receber os updates via webhook em produção ou com ferramenta de túnel:
 
 ---
 
-## 5. Contas de Teste Criadas pelo Seed (Senha padrão: `123456`)
+## 5. Banco de Dados e Migrations
+
+A estrutura do banco de dados PostgreSQL é versionada através do Prisma em `backend/prisma/migrations/`:
+- O backend aplica automaticamente as migrations pendentes ao subir (`sh prisma/migrate.sh`).
+- **Bancos pré-existentes:** Bancos criados antes desta mudança (via `db push`) são adotados de forma automática (a migration `0_init` é marcada como aplicada na primeira inicialização).
+- **Alterações no banco:** Para alterar o esquema, edite `backend/prisma/schema.prisma` e execute `npm run prisma:migrate:dev -- --name <nome>` com o PostgreSQL local em execução; em seguida, comite a pasta da migration gerada.
+- **Atenção:** Não utilize mais `prisma db push` (ou `npm run prisma:push`), pois ele pode descartar dados durante alterações destrutivas.
+
+---
+
+## 6. Contas de Teste Criadas pelo Seed (Senha padrão: `123456`)
 
 | Papel (RBAC) | Nome | E-mail | Comportamento no Fluxo |
 | :--- | :--- | :--- | :--- |
@@ -185,7 +195,7 @@ Para receber os updates via webhook em produção ou com ferramenta de túnel:
 
 ---
 
-## 6. Procedimentos de Backup e Recuperação (DevOps)
+## 7. Procedimentos de Backup e Recuperação (DevOps)
 
 ### Executar Backup Manual
 * **Linux / Container:**
