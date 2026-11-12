@@ -51,6 +51,8 @@ import { useTelegramLink } from './hooks/useTelegramLink';
 import { ConfirmDialog, ConfirmModalProps } from './components/ConfirmDialog';
 import { FeedbackBanner } from './components/FeedbackBanner';
 import { UserMenu } from './components/UserMenu';
+import { SessionLoading } from './components/SessionLoading';
+import { SessionLoadError } from './components/SessionLoadError';
 import { LoginPage } from './pages/LoginPage';
 import { AgendaPage } from './pages/AgendaPage';
 import { AcessosPage } from './pages/AcessosPage';
@@ -136,6 +138,7 @@ export function App() {
   const [email, setEmail] = useState('dr.joao@vidaemdia.com.br');
   const [password, setPassword] = useState('123456');
   const [authError, setAuthError] = useState<string | null>(null);
+  const [initialLoadError, setInitialLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Data State
@@ -270,6 +273,7 @@ export function App() {
 
   async function loadInitialData(jwt: string) {
     try {
+      setInitialLoadError(null);
       setLoading(true);
       const [me, calData, profs, audits, notifStatus, health] = await Promise.all([
         getMe(jwt),
@@ -309,6 +313,13 @@ export function App() {
     } catch (err: any) {
       if (err.status === 401) {
         handleLogout();
+      } else {
+        const message = getErrorMessageByStatus(err?.status);
+        if (!user) {
+          setInitialLoadError(message);
+        } else {
+          setFeedbackBanner({ type: 'error', title: 'Não foi possível atualizar os dados.', detail: message });
+        }
       }
     } finally {
       setLoading(false);
@@ -365,6 +376,7 @@ export function App() {
     localStorage.removeItem('vidaemdia_jwt');
     setToken(null);
     setUser(null);
+    setInitialLoadError(null);
     setSelectedCalendarId('');
     setAppointments([]);
     navigate(LOGIN_PATH, { replace: true });
@@ -687,7 +699,7 @@ export function App() {
   // ==========================================
   // TELA DE LOGIN (Fluxo Principal - Etapa 1 e 2)
   // ==========================================
-  if (!token || !user) {
+  if (!token) {
     return (
       <LoginPage
         email={email}
@@ -699,6 +711,19 @@ export function App() {
         onLogin={handleLogin}
       />
     );
+  }
+  if (!user) {
+    if (initialLoadError) {
+      return (
+        <SessionLoadError
+          message={initialLoadError}
+          retrying={loading}
+          onRetry={() => loadInitialData(token)}
+          onLogout={handleLogout}
+        />
+      );
+    }
+    return <SessionLoading />;
   }
 
   const allAccessibleCalendars = [...ownedCalendars, ...delegatedCalendars];
