@@ -1,7 +1,7 @@
 {
   "name": "vidaemdia-backend",
   "version": "1.0.0",
-  "description": "Backend NestJS do sistema VidaEmDia (Gestão de Agenda Pessoal/Profissional, RBAC, Auditoria e Worker WhatsApp/Telegram)",
+  "description": "Backend NestJS do sistema VidaEmDia (Gestão de Agenda Pessoal/Profissional, RBAC, Auditoria e Worker de lembretes no Telegram)",
   "private": true,
   "scripts": {
     "build": "nest build",
