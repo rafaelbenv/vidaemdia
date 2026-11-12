@@ -1076,6 +1076,8 @@ export function App() {
             onOpenAppointment={openEditAppointment}
             onNewAppointment={openNewAppointment}
             telegramLinked={telegramLinked}
+            telegramWaiting={telegramWaiting}
+            telegramConnecting={submitting['telegram']}
             onConnectTelegram={handleConnectTelegram}
           />
         )}

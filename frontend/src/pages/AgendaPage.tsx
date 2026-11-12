@@ -17,6 +17,7 @@ import {
 import { WeekStrip } from '../components/agenda/WeekStrip';
 import { DayList } from '../components/agenda/DayList';
 import { MonthGrid } from '../components/agenda/MonthGrid';
+import { TelegramCard } from '../components/agenda/TelegramCard';
 
 export interface AgendaPageProps {
   user: User;
@@ -27,6 +28,8 @@ export interface AgendaPageProps {
   onOpenAppointment: (appt: Appointment) => void;
   onNewAppointment: (date?: string) => void;
   telegramLinked?: boolean;
+  telegramWaiting?: boolean;
+  telegramConnecting?: boolean;
   onConnectTelegram: () => void;
 }
 
@@ -39,10 +42,28 @@ export function AgendaPage({
   onOpenAppointment,
   onNewAppointment,
   telegramLinked,
+  telegramWaiting,
+  telegramConnecting,
   onConnectTelegram,
 }: AgendaPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [now, setNow] = useState(() => new Date());
+  const [telegramCardDismissed, setTelegramCardDismissed] = useState<boolean>(() => {
+    try {
+      return typeof window !== 'undefined' && sessionStorage['vidaemdia_tg_card'] === 'hidden';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleDismissTelegramCard = () => {
+    setTelegramCardDismissed(true);
+    try {
+      sessionStorage['vidaemdia_tg_card'] = 'hidden';
+    } catch {
+      // Ignora erro ao gravar no sessionStorage
+    }
+  };
 
   // now: estado atualizado a cada 60 s para os marcadores
   useEffect(() => {
@@ -164,6 +185,8 @@ export function AgendaPage({
     );
   }, [appointments, selectedDayKey]);
 
+  const showTelegramCard = !telegramLinked && !telegramCardDismissed;
+
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
       {/* Cabeçalho da data e controles */}
@@ -241,6 +264,17 @@ export function AgendaPage({
           )}
         </div>
       </div>
+
+      {showTelegramCard && (
+        <div className="mt-4">
+          <TelegramCard
+            waiting={Boolean(telegramWaiting)}
+            connecting={Boolean(telegramConnecting)}
+            onConnect={onConnectTelegram}
+            onDismiss={handleDismissTelegramCard}
+          />
+        </div>
+      )}
 
       {/* 3. Conteúdo principal: Mês ou Dia */}
       {isMonthView ? (
