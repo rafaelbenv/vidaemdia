@@ -9,7 +9,9 @@ import {
   User,
 } from './types';
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+// Em produção o nginx encaminha /api para o backend; no dev, o proxy do Vite faz o mesmo.
+// VITE_API_URL só é necessário para apontar o front de dev para outro backend.
+export const API_BASE_URL: string = (import.meta as any).env?.VITE_API_URL || '/api';
 
 let unauthorizedHandler: (() => void) | null = null;
 export function setUnauthorizedHandler(fn: (() => void) | null) {
