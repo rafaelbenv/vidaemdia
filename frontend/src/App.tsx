@@ -189,8 +189,8 @@ export function App() {
   } = useTelegramLink();
 
   // Login State
-  const [email, setEmail] = useState('dr.joao@vidaemdia.com.br');
-  const [password, setPassword] = useState('123456');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
   const [initialLoadError, setInitialLoadError] = useState<string | null>(null);
 
@@ -445,13 +445,21 @@ export function App() {
     }
   }
 
-  async function handleLogin(e?: React.FormEvent, quickEmail?: string) {
+  async function handleLogin(e?: React.FormEvent, demo?: { email: string; password: string }) {
     if (e) e.preventDefault();
     setAuthError(null);
-    const loginEmail = quickEmail || email;
+
+    const loginEmail = demo ? demo.email : email;
+    const loginPassword = demo ? demo.password : password;
+
+    if (!demo && (!loginEmail.trim() || !loginPassword)) {
+      setAuthError('Informe o e-mail e a senha.');
+      return;
+    }
+
     try {
       setLoading(true);
-      const res = await login(loginEmail, password);
+      const res = await login(loginEmail.trim(), loginPassword);
       localStorage.setItem('vidaemdia_jwt', res.accessToken);
       setSelectedCalendarId('');
       setToken(res.accessToken);
