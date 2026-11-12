@@ -1,10 +1,10 @@
 import React from 'react';
 import { Activity, Database, ShieldAlert, FileText } from 'lucide-react';
-import { AuditLogEntry } from '../types';
+import { AuditLogEntry, HealthData } from '../types';
 import { TechTag } from '../components/TechTag';
 
 export interface AuditoriaPageProps {
-  healthData: any;
+  healthData: HealthData | null;
   auditLogs: AuditLogEntry[];
 }
 

@@ -5,6 +5,8 @@ import {
   cancelAppointment,
   createAppointment,
   createTelegramLink,
+  errorMessage,
+  errorStatus,
   getAppointments,
   getAuditLogs,
   getCalendars,
@@ -28,9 +30,11 @@ import {
   Calendar,
   ChatMessage,
   DispatchedMessageLog,
+  HealthData,
   ProfessionalDirectoryEntry,
   Reminder,
   User,
+  WorkerStats,
 } from './types';
 import {
   checkIsPast,
@@ -208,10 +212,10 @@ export function App() {
   }
 
   // Worker & Notification State
-  const [workerStats, setWorkerStats] = useState<any>(null);
+  const [workerStats, setWorkerStats] = useState<WorkerStats | null>(null);
   const [remindersQueue, setRemindersQueue] = useState<Reminder[]>([]);
   const [dispatchedMessages, setDispatchedMessages] = useState<DispatchedMessageLog[]>([]);
-  const [healthData, setHealthData] = useState<any>(null);
+  const [healthData, setHealthData] = useState<HealthData | null>(null);
 
   // Form State (Fluxo Principal - Etapa 3)
   const {
@@ -294,7 +298,7 @@ export function App() {
       setDispatchedMessages(notifStatus.dispatchedMessages);
       setHealthData(health);
 
-      let isTgLinked = Boolean((me as any).telegramLinked);
+      let isTgLinked = Boolean(me.telegramLinked);
       try {
         const tgStatus = await getTelegramStatus(jwt);
         isTgLinked = tgStatus.linked;
@@ -310,11 +314,11 @@ export function App() {
       if (firstCal && !selectedCalendarId) {
         setSelectedCalendarId(firstCal);
       }
-    } catch (err: any) {
-      if (err.status === 401) {
+    } catch (err: unknown) {
+      if (errorStatus(err) === 401) {
         handleLogout();
       } else {
-        const message = getErrorMessageByStatus(err?.status);
+        const message = getErrorMessageByStatus(errorStatus(err));
         if (!user) {
           setInitialLoadError(message);
         } else {
@@ -332,12 +336,12 @@ export function App() {
     try {
       const list = await getAppointments(token, calendarId);
       setAppointments(list);
-    } catch (err: any) {
-      const status = err.status || 500;
+    } catch (err: unknown) {
+      const status = errorStatus(err) || 500;
       setFeedbackBanner({
         type: 'error',
-        title: getErrorMessageByStatus(err.status),
-        detail: `${status} — ${err.message || 'Erro ao carregar compromissos desta agenda'}`,
+        title: getErrorMessageByStatus(errorStatus(err)),
+        detail: `${status} — ${errorMessage(err, 'Erro ao carregar compromissos desta agenda')}`,
       });
     } finally {
       setLoadingAppointments(false);
@@ -362,8 +366,8 @@ export function App() {
         title: `Bem-vindo, ${res.user.name}!`,
         detail: `Autenticado com sucesso via JWT como ${res.user.name} (${res.user.role})`,
       });
-    } catch (err: any) {
-      setAuthError(err.message || 'Falha na autenticação');
+    } catch (err: unknown) {
+      setAuthError(errorMessage(err, 'Falha na autenticação'));
     } finally {
       setLoading(false);
     }
@@ -426,11 +430,12 @@ export function App() {
       pollingTimeoutRef.current = window.setTimeout(() => {
         stopPolling();
       }, maxDuration);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const status = errorStatus(err) || 500;
       setFeedbackBanner({
         type: 'error',
         title: 'Não foi possível conectar o Telegram.',
-        detail: `${err.status || 500} — ${err.message || 'Erro ao gerar link de conexão do Telegram'}`,
+        detail: `${status} — ${errorMessage(err, 'Erro ao gerar link de conexão do Telegram')}`,
       });
     } finally {
       setSubmittingKey('telegram', false);
@@ -452,11 +457,12 @@ export function App() {
         title: 'Telegram desconectado com sucesso!',
       });
       await loadInitialData(token);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const status = errorStatus(err) || 500;
       setFeedbackBanner({
         type: 'error',
         title: 'Não foi possível desconectar o Telegram.',
-        detail: `${err.status || 500} — ${err.message || 'Erro ao desconectar Telegram'}`,
+        detail: `${status} — ${errorMessage(err, 'Erro ao desconectar Telegram')}`,
       });
     } finally {
       setSubmittingKey('telegram', false);
@@ -502,12 +508,12 @@ export function App() {
 
       await loadAppointments(selectedCalendarId);
       await loadInitialData(token);
-    } catch (err: any) {
-      const status = err.status;
+    } catch (err: unknown) {
+      const status = errorStatus(err);
       setFeedbackBanner({
         type: 'error',
         title: getErrorMessageByStatus(status),
-        detail: `${status || 400} — ${err.message}`,
+        detail: `${status || 400} — ${errorMessage(err)}`,
       });
       if (token) {
         const audits = await getAuditLogs(token);
@@ -534,12 +540,12 @@ export function App() {
       });
       await loadAppointments(selectedCalendarId);
       await loadInitialData(token);
-    } catch (err: any) {
-      const status = err.status;
+    } catch (err: unknown) {
+      const status = errorStatus(err);
       setFeedbackBanner({
         type: 'error',
         title: getErrorMessageByStatus(status),
-        detail: `${status || 403} — ${err.message}`,
+        detail: `${status || 403} — ${errorMessage(err)}`,
       });
     } finally {
       setSubmittingKey(key, false);
@@ -559,12 +565,12 @@ export function App() {
         title: `Acessando agenda de ${profName}.`,
         detail: 'Autorização RBAC validada',
       });
-    } catch (err: any) {
-      const status = err.status || 403;
+    } catch (err: unknown) {
+      const status = errorStatus(err) || 403;
       setFeedbackBanner({
         type: 'error',
         title: getErrorMessageByStatus(status),
-        detail: `${status} — ${err.message || '403 Acesso negado: Secretária não tem autorização para esta agenda.'}`,
+        detail: `${status} — ${errorMessage(err, '403 Acesso negado: Secretária não tem autorização para esta agenda.')}`,
       });
       // Atualiza logs de auditoria para mostrar o bloqueio 403 gravado
       const audits = await getAuditLogs(token);
@@ -596,12 +602,12 @@ export function App() {
         detail: '200 OK — Permissão RBAC concedida',
       });
       await loadInitialData(token);
-    } catch (err: any) {
-      const status = err.status;
+    } catch (err: unknown) {
+      const status = errorStatus(err);
       setFeedbackBanner({
         type: 'error',
         title: getErrorMessageByStatus(status),
-        detail: `${status || 400} — ${err.message}`,
+        detail: `${status || 400} — ${errorMessage(err)}`,
       });
     } finally {
       setSubmittingKey('grant', false);
@@ -620,11 +626,12 @@ export function App() {
         detail: `Worker Executado: ${res.message}`,
       });
       await loadInitialData(token);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const status = errorStatus(err);
       setFeedbackBanner({
         type: 'error',
-        title: getErrorMessageByStatus(err.status),
-        detail: `${err.status || 500} — ${err.message}`,
+        title: getErrorMessageByStatus(status),
+        detail: `${status || 500} — ${errorMessage(err)}`,
       });
     } finally {
       setSubmittingKey('worker', false);
@@ -640,11 +647,12 @@ export function App() {
         title: 'Simulação de falha ativada! O próximo envio ao Telegram falhará.',
         detail: 'Fila de Retry: máx. 3 tentativas no PostgreSQL',
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const status = errorStatus(err);
       setFeedbackBanner({
         type: 'error',
-        title: getErrorMessageByStatus(err.status),
-        detail: `${err.status || 500} — ${err.message}`,
+        title: getErrorMessageByStatus(status),
+        detail: `${status || 500} — ${errorMessage(err)}`,
       });
     }
   }
@@ -681,12 +689,12 @@ export function App() {
         await loadInitialData(token);
         if (selectedCalendarId) await loadAppointments(selectedCalendarId);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setChatHistory((prev) => [
         ...prev,
         {
           sender: 'BOT',
-          text: `❌ Erro ao processar comando: ${err.message}`,
+          text: `❌ Erro ao processar comando: ${errorMessage(err)}`,
           time: nowTime,
           channel: 'TELEGRAM',
         },

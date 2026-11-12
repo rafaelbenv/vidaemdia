@@ -107,7 +107,7 @@ export interface AuditLogEntry {
   entityId?: string;
   action: string;
   details: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   ipAddress?: string;
   createdAt: string;
   actorUser?: User;
@@ -134,5 +134,109 @@ export interface ChatMessage {
   time: string;
   channel: string;
 }
+
+export interface WorkerStats {
+  isRunning: boolean;
+  lastRunAt: string | null;
+  totalCycles: number;
+  maxRetries: number;
+}
+
+export interface NotificationsStatus {
+  worker: WorkerStats;
+  reminders: Reminder[];
+  dispatchedMessages: DispatchedMessageLog[];
+}
+
+export interface HealthServices {
+  backend: string;
+  postgresql: string;
+  notificationWorker: string;
+}
+
+export interface HealthDatabaseStats {
+  usersCount?: number;
+  calendarsCount?: number;
+  appointmentsCount?: number;
+  pendingRemindersCount?: number;
+  auditLogsCount?: number;
+}
+
+export interface HealthMetrics {
+  appointmentsCreatedWeb?: number;
+  appointmentsCreatedWhatsapp?: number;
+  appointmentsCreatedTelegram?: number;
+  remindersSentWhatsapp?: number;
+  remindersSentTelegram?: number;
+  remindersFailed?: number;
+  rbacAccessDenied?: number;
+  authFailures?: number;
+  telegramUpdatesReceived?: number;
+  telegramApiErrors?: number;
+  uptimeSeconds?: number;
+}
+
+export interface HealthData {
+  status: string;
+  timestamp: string;
+  services: HealthServices;
+  databaseStats: HealthDatabaseStats;
+  metrics: HealthMetrics;
+}
+
+export interface VerifyAccessResponse {
+  authorized: boolean;
+  isDelegated: boolean;
+  calendar: Calendar;
+}
+
+export interface GrantPermissionBody {
+  secretaryEmail: string;
+  canView?: boolean;
+  canCreate?: boolean;
+  canUpdate?: boolean;
+  canCancel?: boolean;
+}
+
+export interface GrantPermissionResponse extends CalendarPermission {
+  calendarId: string;
+  granteeUserId: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface RunWorkerResponse {
+  cycle?: number;
+  processed: number;
+  sent?: number;
+  retried?: number;
+  failedPermanently?: number;
+  message: string;
+}
+
+export interface SimulateFailureBody {
+  failCount?: number;
+}
+
+export interface SimulateFailureResponse {
+  simulateFailureNextCount: number;
+}
+
+export interface CreateAppointmentBody {
+  calendarId: string;
+  title: string;
+  description?: string;
+  startTime: string;
+  endTime?: string;
+  reminderMinutesBefore?: number;
+  reminderChannel?: NotificationChannel;
+}
+
+export interface BotMessageBody {
+  text: string;
+  channel?: string;
+  senderIdentifier?: string;
+}
+
 
 

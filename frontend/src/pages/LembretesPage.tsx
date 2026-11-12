@@ -1,13 +1,13 @@
 import React from 'react';
 import { Bell, RefreshCw, Smartphone } from 'lucide-react';
-import { DispatchedMessageLog, Reminder } from '../types';
+import { DispatchedMessageLog, Reminder, WorkerStats } from '../types';
 import { TechTag } from '../components/TechTag';
 
 export interface LembretesPageProps {
   handleSimulateFailure: () => Promise<void>;
   handleRunWorkerNow: () => Promise<void>;
   submitting: Record<string, boolean>;
-  workerStats: any;
+  workerStats: WorkerStats | null;
   remindersQueue: Reminder[];
   dispatchedMessages: DispatchedMessageLog[];
 }
