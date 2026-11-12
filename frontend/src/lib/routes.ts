@@ -11,6 +11,7 @@ export type LucideIcon = typeof Bell;
 export const LOGIN_PATH = '/entrar';
 export const AGENDA_PATH = '/agenda';
 export const COMPARTILHAR_PATH = '/agenda/compartilhar';
+export const HISTORICO_PATH = '/agenda/historico';
 export const SHOW_BASTIDORES = import.meta.env.VITE_SHOW_BASTIDORES !== 'false';
 export type BastidoresSection = 'lembretes' | 'assistente' | 'acesso' | 'auditoria' | 'saude';
 

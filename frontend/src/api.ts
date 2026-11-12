@@ -117,6 +117,13 @@ export async function getAuditLogs(token: string): Promise<AuditLogEntry[]> {
   return apiRequest<AuditLogEntry[]>('/auditoria', {}, token);
 }
 
+export async function getCalendarHistory(
+  token: string,
+  calendarId: string,
+): Promise<AuditLogEntry[]> {
+  return apiRequest<AuditLogEntry[]>(`/auditoria?calendarId=${encodeURIComponent(calendarId)}`, {}, token);
+}
+
 export async function getNotificationsStatus(token: string): Promise<NotificationsStatus> {
   return apiRequest<NotificationsStatus>('/notificacoes/status', {}, token);
 }

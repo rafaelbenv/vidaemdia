@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, ChevronDown, Users } from 'lucide-react';
+import { Check, ChevronDown, History, Users } from 'lucide-react';
 import { Calendar } from '../types';
 import { useDropdown } from '../hooks/useDropdown';
 
@@ -10,6 +10,7 @@ export interface CalendarMenuProps {
   canShareSelected: boolean;
   onSelect: (id: string) => void;
   onShare: () => void;
+  onHistory: () => void;
 }
 
 export function CalendarMenu({
@@ -19,6 +20,7 @@ export function CalendarMenu({
   canShareSelected,
   onSelect,
   onShare,
+  onHistory,
 }: CalendarMenuProps) {
   const { open, setOpen, ref } = useDropdown<HTMLDivElement>();
 
@@ -176,6 +178,18 @@ export function CalendarMenu({
               >
                 <Users className="w-4 h-4 text-stone-500 shrink-0" />
                 <span>Compartilhar esta agenda</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  onHistory();
+                }}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-stone-100 flex items-center gap-2 min-h-[40px] text-stone-700"
+              >
+                <History className="w-4 h-4 text-stone-500 shrink-0" />
+                <span>Histórico desta agenda</span>
               </button>
             </>
           )}

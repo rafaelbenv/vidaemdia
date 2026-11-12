@@ -50,6 +50,7 @@ import { formatRemindSuffix } from './lib/reminderText';
 import {
   AGENDA_PATH,
   COMPARTILHAR_PATH,
+  HISTORICO_PATH,
   LOGIN_PATH,
   SHOW_BASTIDORES,
   bastidoresPath,
@@ -69,6 +70,7 @@ import { AppointmentFormValues, AppointmentPanel } from './components/agenda/App
 import { LoginPage } from './pages/LoginPage';
 import { AgendaPage } from './pages/AgendaPage';
 import { CompartilharPage } from './pages/CompartilharPage';
+import { HistoricoPage } from './pages/HistoricoPage';
 import { TesteAcessoPage } from './pages/TesteAcessoPage';
 import { LembretesPage } from './pages/LembretesPage';
 import { AssistentePage } from './pages/AssistentePage';
@@ -136,7 +138,7 @@ export function App() {
     }
     const target = allAccessibleCalendars.find((c) => c.id === id);
     const targetCanShare = target ? target.ownerId === user?.id || user?.role === 'ADMIN' : false;
-    if (rawPath === COMPARTILHAR_PATH && !targetCanShare) {
+    if ((rawPath === COMPARTILHAR_PATH || rawPath === HISTORICO_PATH) && !targetCanShare) {
       navigate(AGENDA_PATH);
     }
   }
@@ -159,7 +161,7 @@ export function App() {
     const isBastidoresValid = currentSection !== null && SHOW_BASTIDORES;
     const isAgenda = path === AGENDA_PATH;
 
-    if (path === COMPARTILHAR_PATH) {
+    if (path === COMPARTILHAR_PATH || path === HISTORICO_PATH) {
       if (loading || allAccessibleCalendars.length === 0) {
         return; // Aguardar as agendas carregarem antes de redirecionar
       }
@@ -1008,7 +1010,7 @@ export function App() {
               <span className="font-bold text-lg hidden sm:inline">VidaEmDia</span>
             </div>
 
-            {(rawPath === AGENDA_PATH || rawPath === COMPARTILHAR_PATH) && (
+            {(rawPath === AGENDA_PATH || rawPath === COMPARTILHAR_PATH || rawPath === HISTORICO_PATH) && (
               <CalendarMenu
                 owned={ownedCalendars}
                 delegated={delegatedCalendars}
@@ -1016,6 +1018,7 @@ export function App() {
                 canShareSelected={canShareSelected}
                 onSelect={handleSelectCalendar}
                 onShare={() => navigate(COMPARTILHAR_PATH)}
+                onHistory={() => navigate(HISTORICO_PATH)}
               />
             )}
           </div>
@@ -1054,6 +1057,13 @@ export function App() {
             me={user}
             onGrant={handleGrantAccess}
             onRevoke={handleRevokeAccess}
+            onBack={() => navigate(AGENDA_PATH)}
+          />
+        ) : rawPath === HISTORICO_PATH && canShareSelected && activeCalendar && token ? (
+          <HistoricoPage
+            token={token}
+            calendar={activeCalendar}
+            me={user}
             onBack={() => navigate(AGENDA_PATH)}
           />
         ) : (

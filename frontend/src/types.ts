@@ -105,6 +105,32 @@ export interface ProfessionalDirectoryEntry {
   }>;
 }
 
+export interface AuditLogMetadataAppointmentSnapshot {
+  title?: string;
+  startTime?: string;
+  endTime?: string;
+  status?: string;
+}
+
+export interface AuditLogMetadata {
+  title?: string;
+  startTime?: string;
+  endTime?: string;
+  reminderChannel?: string;
+  reminderMinutesBefore?: number;
+  isDelegated?: boolean;
+  createdVia?: string;
+  before?: AuditLogMetadataAppointmentSnapshot;
+  after?: AuditLogMetadataAppointmentSnapshot;
+  granteeUserId?: string;
+  granteeName?: string;
+  granteeEmail?: string;
+  operation?: string;
+  userRole?: string;
+  calendarOwner?: string;
+  [key: string]: unknown;
+}
+
 export interface AuditLogEntry {
   id: string;
   actorUserId?: string;
@@ -113,7 +139,7 @@ export interface AuditLogEntry {
   entityId?: string;
   action: string;
   details: string;
-  metadata?: Record<string, unknown>;
+  metadata?: AuditLogMetadata | Record<string, unknown>;
   ipAddress?: string;
   createdAt: string;
   actorUser?: User;
