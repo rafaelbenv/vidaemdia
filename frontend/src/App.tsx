@@ -42,13 +42,13 @@ import {
   getErrorMessageByStatus,
 } from './lib/format';
 import {
-  getVisibleTabs,
+  AGENDA_PATH,
+  COMPARTILHAR_PATH,
   LOGIN_PATH,
-  TAB_DEFINITIONS,
-  TAB_PATHS,
-  tabFromPath,
-  TabId,
-} from './lib/tabs';
+  SHOW_BASTIDORES,
+  bastidoresPath,
+  sectionFromPath,
+} from './lib/routes';
 import { useUserMenu } from './hooks/useUserMenu';
 import { useAppointmentForm } from './hooks/useAppointmentForm';
 import { useTelegramLink } from './hooks/useTelegramLink';
@@ -57,75 +57,51 @@ import { FeedbackBanner } from './components/FeedbackBanner';
 import { UserMenu } from './components/UserMenu';
 import { SessionLoading } from './components/SessionLoading';
 import { SessionLoadError } from './components/SessionLoadError';
+import { BastidoresLayout } from './components/BastidoresLayout';
 import { LoginPage } from './pages/LoginPage';
 import { AgendaPage } from './pages/AgendaPage';
-import { AcessosPage } from './pages/AcessosPage';
+import { CompartilharPage } from './pages/CompartilharPage';
+import { TesteAcessoPage } from './pages/TesteAcessoPage';
 import { LembretesPage } from './pages/LembretesPage';
 import { AssistentePage } from './pages/AssistentePage';
 import { AuditoriaPage } from './pages/AuditoriaPage';
+import { SaudePage } from './pages/SaudePage';
 
 export function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  const activeTab: TabId = tabFromPath(location.pathname) ?? 'agenda';
-  const setActiveTab = (tab: TabId) => navigate(TAB_PATHS[tab]);
-
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('vidaemdia_jwt'));
   const [user, setUser] = useState<User | null>(null);
   const { userMenuOpen, setUserMenuOpen, userMenuRef } = useUserMenu();
 
+  const rawPath = location.pathname.replace(/\/+$/, '') || '/';
+  const section = sectionFromPath(rawPath);
+  const canShare = user?.role === 'PROFESSIONAL' || user?.role === 'ADMIN';
+  const canControlWorker = user?.role === 'PROFESSIONAL' || user?.role === 'ADMIN';
+
   // Redirecionamento baseado na sessão e na URL
   useEffect(() => {
-    const path = location.pathname;
+    const path = location.pathname.replace(/\/+$/, '') || '/';
     if (!token) {
       if (path !== LOGIN_PATH) navigate(LOGIN_PATH, { replace: true });
       return;
     }
     if (!user) return; // sessão ainda sendo validada: não mexe na URL (recarregar mantém a tela)
-    if (path === LOGIN_PATH || tabFromPath(path) === null) {
-      navigate(TAB_PATHS.agenda, { replace: true });
-    }
-  }, [token, user, location.pathname, navigate]);
 
-  // Se a aba ativa sumir ao trocar de conta, volta para "Agenda"
-  useEffect(() => {
-    if (user) {
-      const visible = getVisibleTabs(user.role);
-      if (!visible.includes(activeTab)) {
-        navigate(TAB_PATHS.agenda, { replace: true });
-      }
-    }
-  }, [user, activeTab, navigate]);
-
-  // Navegação acessível por teclado na barra de abas (setas ← / →, Home e End)
-  const handleTabKeyDown = (e: React.KeyboardEvent, currentTabId: TabId) => {
-    const visibleTabIds = getVisibleTabs(user?.role);
-    const currentIndex = visibleTabIds.indexOf(currentTabId);
-    if (currentIndex === -1) return;
-
-    let nextIndex = -1;
-    if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      nextIndex = (currentIndex + 1) % visibleTabIds.length;
-    } else if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      nextIndex = (currentIndex - 1 + visibleTabIds.length) % visibleTabIds.length;
-    } else if (e.key === 'Home') {
-      e.preventDefault();
-      nextIndex = 0;
-    } else if (e.key === 'End') {
-      e.preventDefault();
-      nextIndex = visibleTabIds.length - 1;
+    if (SHOW_BASTIDORES && path === '/bastidores') {
+      navigate(bastidoresPath('lembretes'), { replace: true });
+      return;
     }
 
-    if (nextIndex !== -1) {
-      const nextTabId = visibleTabIds[nextIndex];
-      setActiveTab(nextTabId);
-      setTimeout(() => {
-        document.getElementById(`tab-${nextTabId}`)?.focus();
-      }, 0);
+    const currentSection = sectionFromPath(path);
+    const isBastidoresValid = currentSection !== null && SHOW_BASTIDORES;
+    const isAgenda = path === AGENDA_PATH;
+    const isCompartilharValid = path === COMPARTILHAR_PATH && canShare;
+
+    if (!isBastidoresValid && !isAgenda && !isCompartilharValid) {
+      navigate(AGENDA_PATH, { replace: true });
     }
-  };
+  }, [token, user, canShare, location.pathname, navigate]);
 
   // Telegram Integration State
   const {
@@ -359,7 +335,7 @@ export function App() {
       setSelectedCalendarId('');
       setToken(res.accessToken);
       setUser(res.user);
-      setActiveTab('agenda');
+      navigate(AGENDA_PATH);
       setUserMenuOpen(false);
       setFeedbackBanner({
         type: 'success',
@@ -559,7 +535,7 @@ export function App() {
     try {
       await verifyCalendarAccess(token, calendarId);
       setSelectedCalendarId(calendarId);
-      setActiveTab('agenda');
+      navigate(AGENDA_PATH);
       setFeedbackBanner({
         type: 'success',
         title: `Acessando agenda de ${profName}.`,
@@ -736,12 +712,6 @@ export function App() {
 
   const allAccessibleCalendars = [...ownedCalendars, ...delegatedCalendars];
   const activeCalendar = allAccessibleCalendars.find((c) => c.id === selectedCalendarId);
-  const showSecretaryPanel = user?.role === 'SECRETARY' || user?.role === 'ADMIN';
-  const showProfessionalPanel = user?.role === 'PROFESSIONAL' || user?.role === 'ADMIN';
-  const isSinglePanel = (showSecretaryPanel && !showProfessionalPanel) || (!showSecretaryPanel && showProfessionalPanel);
-  const pendingRemindersCount = remindersQueue.filter((r) => r.status === 'PENDING').length;
-  const visibleTabIds = getVisibleTabs(user?.role);
-  const visibleTabs = TAB_DEFINITIONS.filter((t) => visibleTabIds.includes(t.id));
 
   const userInitials = user.name
     ? user.name
@@ -752,6 +722,82 @@ export function App() {
         .join('')
         .toUpperCase()
     : 'U';
+
+  // Diálogo de confirmação acessível reutilizado em ambos os layouts
+  const confirmDialogElement = (
+    <ConfirmDialog
+      isOpen={Boolean(confirmModal)}
+      title={confirmModal?.title || ''}
+      message={confirmModal?.message || ''}
+      confirmLabel={confirmModal?.confirmLabel || 'Confirmar'}
+      confirmLoadingLabel={confirmModal?.confirmLoadingLabel}
+      cancelLabel={confirmModal?.cancelLabel || 'Cancelar'}
+      confirmVariant={confirmModal?.confirmVariant || 'danger'}
+      isLoading={confirmModal?.loadingKey ? Boolean(submitting[confirmModal.loadingKey]) : false}
+      onConfirm={async () => {
+        if (confirmModal?.onConfirm) {
+          await confirmModal.onConfirm();
+        }
+      }}
+      onCancel={() => setConfirmModal(null)}
+    />
+  );
+
+  // Banner de feedback reutilizado em ambos os layouts
+  const feedbackBannerElement = feedbackBanner ? (
+    <FeedbackBanner
+      feedbackBanner={feedbackBanner}
+      setFeedbackBanner={setFeedbackBanner}
+    />
+  ) : null;
+
+  if (section !== null && SHOW_BASTIDORES) {
+    return (
+      <>
+        <BastidoresLayout
+          section={section}
+          userName={user.name}
+          onBack={() => navigate(AGENDA_PATH)}
+          feedbackBanner={feedbackBannerElement}
+        >
+          {section === 'lembretes' && (
+            <LembretesPage
+              handleSimulateFailure={handleSimulateFailure}
+              handleRunWorkerNow={handleRunWorkerNow}
+              submitting={submitting}
+              workerStats={workerStats}
+              remindersQueue={remindersQueue}
+              dispatchedMessages={dispatchedMessages}
+              canControlWorker={canControlWorker}
+            />
+          )}
+          {section === 'assistente' && (
+            <AssistentePage
+              chatHistory={chatHistory}
+              setBotInput={setBotInput}
+              botInput={botInput}
+              handleSendBotMessage={handleSendBotMessage}
+              submitting={submitting}
+            />
+          )}
+          {section === 'acesso' && (
+            <TesteAcessoPage
+              professionals={professionals}
+              user={user}
+              handleSelectProfessionalCalendar={handleSelectProfessionalCalendar}
+            />
+          )}
+          {section === 'auditoria' && (
+            <AuditoriaPage auditLogs={auditLogs} />
+          )}
+          {section === 'saude' && (
+            <SaudePage healthData={healthData} auditLogsCount={auditLogs.length} />
+          )}
+        </BastidoresLayout>
+        {confirmDialogElement}
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-stone-50 flex flex-col">
@@ -772,7 +818,7 @@ export function App() {
             </div>
           </div>
 
-          {/* Menu do Avatar (agrupa Telegram, Informações do Usuário e Sair) */}
+          {/* Menu do Avatar (agrupa Telegram, Informações do Usuário, Compartilhar, Bastidores e Sair) */}
           <UserMenu
             user={user}
             userMenuOpen={userMenuOpen}
@@ -785,75 +831,31 @@ export function App() {
             handleConnectTelegram={handleConnectTelegram}
             openUnlinkTelegramDialog={openUnlinkTelegramDialog}
             openLogoutDialog={openLogoutDialog}
+            canShare={canShare}
+            showBastidores={SHOW_BASTIDORES}
+            onOpenShare={() => navigate(COMPARTILHAR_PATH)}
+            onOpenBastidores={() => navigate(bastidoresPath('lembretes'))}
           />
-        </div>
-
-        {/* Sub-barra de Navegação dos Fluxos / Abas */}
-        <div className="relative bg-stone-800/90 border-t border-stone-800">
-          {/* Gradiente nas bordas da barra indicando que há rolagem no mobile (<sm) */}
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-stone-900 to-transparent z-10 sm:hidden"
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-stone-900 to-transparent z-10 sm:hidden"
-          />
-
-          <div
-            role="tablist"
-            aria-label="Navegação de abas"
-            className="max-w-7xl mx-auto px-4 flex overflow-x-auto gap-1 py-1.5 scrollbar-none"
-          >
-            {visibleTabs.map((tab) => {
-              const Icon = tab.icon;
-              const isSelected = activeTab === tab.id;
-              const badgeCount = tab.id === 'worker' ? pendingRemindersCount : undefined;
-
-              return (
-                <button
-                  key={tab.id}
-                  id={`tab-${tab.id}`}
-                  role="tab"
-                  aria-selected={isSelected}
-                  aria-controls={`tabpanel-${tab.id}`}
-                  tabIndex={isSelected ? 0 : -1}
-                  onClick={() => setActiveTab(tab.id)}
-                  onKeyDown={(e) => handleTabKeyDown(e, tab.id)}
-                  className={`px-3.5 py-2 rounded-md text-xs font-semibold flex items-center gap-2 transition whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-brand-500 ${
-                    isSelected
-                      ? 'bg-brand-50 text-brand-800 border-b-2 border-brand-700'
-                      : 'text-stone-300 hover:bg-stone-700/60 hover:text-white border-b-2 border-transparent'
-                  }`}
-                >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  <span>{tab.label}</span>
-                  {Boolean(badgeCount && badgeCount > 0) && (
-                    <span className="px-1.5 py-0.2 bg-brand-700 text-white rounded-full font-mono text-[11px] font-bold">
-                      {badgeCount}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
         </div>
       </header>
 
-      {/* Banner de Feedback de Operações (201 Created, 400 Bad Request, 403 Forbidden RBAC) */}
-      {feedbackBanner && (
-        <FeedbackBanner
-          feedbackBanner={feedbackBanner}
-          setFeedbackBanner={setFeedbackBanner}
-        />
-      )}
+      {/* Banner de Feedback de Operações */}
+      {feedbackBannerElement}
 
       {/* Conteúdo Principal */}
       <main className="max-w-7xl mx-auto w-full px-4 py-6 flex-1">
-        {/* =========================================================
-            ABA 1: FLUXO PRINCIPAL — CADASTRO E VISUALIZAÇÃO DE AGENDA
-           ========================================================= */}
-        {activeTab === 'agenda' && (
+        {rawPath === COMPARTILHAR_PATH && canShare ? (
+          <CompartilharPage
+            onBack={() => navigate(AGENDA_PATH)}
+            selectedCalendarId={selectedCalendarId}
+            setSelectedCalendarId={setSelectedCalendarId}
+            ownedCalendars={ownedCalendars}
+            secretaryEmailToGrant={secretaryEmailToGrant}
+            setSecretaryEmailToGrant={setSecretaryEmailToGrant}
+            handleGrantSecretaryPermission={handleGrantSecretaryPermission}
+            submitting={submitting}
+          />
+        ) : (
           <AgendaPage
             allAccessibleCalendars={allAccessibleCalendars}
             selectedCalendarId={selectedCalendarId}
@@ -882,90 +884,9 @@ export function App() {
             openCancelDialog={openCancelDialog}
           />
         )}
-
-        {/* =========================================================
-            ABA 2: FLUXO RBAC — SECRETÁRIA ACESSANDO AGENDA DE PROFISSIONAL
-           ========================================================= */}
-        {activeTab === 'rbac' && (
-          <AcessosPage
-            isSinglePanel={isSinglePanel}
-            showSecretaryPanel={showSecretaryPanel}
-            showProfessionalPanel={showProfessionalPanel}
-            professionals={professionals}
-            user={user}
-            handleSelectProfessionalCalendar={handleSelectProfessionalCalendar}
-            handleGrantSecretaryPermission={handleGrantSecretaryPermission}
-            selectedCalendarId={selectedCalendarId}
-            setSelectedCalendarId={setSelectedCalendarId}
-            ownedCalendars={ownedCalendars}
-            secretaryEmailToGrant={secretaryEmailToGrant}
-            setSecretaryEmailToGrant={setSecretaryEmailToGrant}
-            submitting={submitting}
-          />
-        )}
-
-        {/* =========================================================
-            ABA 3: FLUXO DE NOTIFICAÇÃO — WORKER + TELEGRAM
-           ========================================================= */}
-        {activeTab === 'worker' && (
-          <LembretesPage
-            handleSimulateFailure={handleSimulateFailure}
-            handleRunWorkerNow={handleRunWorkerNow}
-            submitting={submitting}
-            workerStats={workerStats}
-            remindersQueue={remindersQueue}
-            dispatchedMessages={dispatchedMessages}
-          />
-        )}
-
-        {/* =========================================================
-            ABA 4: CHATBOT TELEGRAM (VISÃO 100% CONVERSACIONAL)
-           ========================================================= */}
-        {activeTab === 'chatbot' && (
-          <AssistentePage
-            chatHistory={chatHistory}
-            setBotInput={setBotInput}
-            botInput={botInput}
-            handleSendBotMessage={handleSendBotMessage}
-            submitting={submitting}
-          />
-        )}
-
-        {/* =========================================================
-            ABA 5: AUDITORIA, SEGURANÇA & MONITORAMENTO DEVOPS
-           ========================================================= */}
-        {activeTab === 'auditoria' && (
-          <AuditoriaPage
-            healthData={healthData}
-            auditLogs={auditLogs}
-          />
-        )}
       </main>
 
-      {/* Barra de Segurança Rodapé fiel ao Diagrama VidaEmDia_Fluxo.drawio.html */}
-      <footer className="bg-stone-900 text-stone-400 text-xs py-3 px-4 border-t border-stone-800 text-center">
-        <strong className="text-stone-200">SEGURANÇA VIDAEMDIA</strong> — HTTPS em todas as
-        comunicações · JWT para autenticação · RBAC para controle de acesso · Credenciais em
-        variáveis de ambiente · Logs de auditoria · Backup periódico do PostgreSQL
-      </footer>
-
-      {/* Diálogo de Confirmação Acessível */}
-      <ConfirmDialog
-        isOpen={Boolean(confirmModal)}
-        title={confirmModal?.title || ''}
-        message={confirmModal?.message || ''}
-        confirmLabel={confirmModal?.confirmLabel || 'Confirmar'}
-        confirmLoadingLabel={confirmModal?.confirmLoadingLabel}
-        cancelLabel={confirmModal?.cancelLabel || 'Cancelar'}
-        confirmVariant={confirmModal?.confirmVariant || 'danger'}
-        isLoading={confirmModal?.loadingKey ? Boolean(submitting[confirmModal.loadingKey]) : false}
-        onConfirm={async () => {
-          if (confirmModal?.onConfirm) {
-            await confirmModal.onConfirm();
-          }
-        }}
-        onCancel={() => setConfirmModal(null)}
-      />
+      {confirmDialogElement}
     </div>
   );
 }

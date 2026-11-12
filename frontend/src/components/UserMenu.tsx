@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown, Send, LogOut } from 'lucide-react';
+import { ChevronDown, Send, LogOut, Users, Wrench } from 'lucide-react';
 import { User } from '../types';
 import { TechTag } from './TechTag';
 
@@ -15,6 +15,10 @@ export interface UserMenuProps {
   handleConnectTelegram: () => void | Promise<void>;
   openUnlinkTelegramDialog: () => void;
   openLogoutDialog: () => void;
+  canShare: boolean;
+  showBastidores: boolean;
+  onOpenShare: () => void;
+  onOpenBastidores: () => void;
 }
 
 export function UserMenu({
@@ -29,6 +33,10 @@ export function UserMenu({
   handleConnectTelegram,
   openUnlinkTelegramDialog,
   openLogoutDialog,
+  canShare,
+  showBastidores,
+  onOpenShare,
+  onOpenBastidores,
 }: UserMenuProps) {
   return (
     <div className="relative" ref={userMenuRef}>
@@ -115,6 +123,38 @@ export function UserMenu({
               </div>
             )}
           </div>
+
+          {/* Ações de Navegação */}
+          {(canShare || showBastidores) && (
+            <div className="px-2 py-1.5 border-b border-stone-100 space-y-0.5">
+              {canShare && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    onOpenShare();
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-100 rounded transition flex items-center gap-2"
+                >
+                  <Users className="w-3.5 h-3.5 text-stone-500" />
+                  Compartilhar agenda
+                </button>
+              )}
+              {showBastidores && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    onOpenBastidores();
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-100 rounded transition flex items-center gap-2"
+                >
+                  <Wrench className="w-3.5 h-3.5 text-stone-500" />
+                  Bastidores (área técnica)
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Ação Sair */}
           <div className="px-2 pt-1.5">

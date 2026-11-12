@@ -10,6 +10,7 @@ export interface LembretesPageProps {
   workerStats: WorkerStats | null;
   remindersQueue: Reminder[];
   dispatchedMessages: DispatchedMessageLog[];
+  canControlWorker?: boolean;
 }
 
 export function LembretesPage({
@@ -19,6 +20,7 @@ export function LembretesPage({
   workerStats,
   remindersQueue,
   dispatchedMessages,
+  canControlWorker = true,
 }: LembretesPageProps) {
   return (
     <div role="tabpanel" id="tabpanel-worker" aria-labelledby="tab-worker">
@@ -38,23 +40,27 @@ export function LembretesPage({
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleSimulateFailure}
-                  className="px-3 py-2 rounded-md border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold transition"
-                >
-                  Simular Erro na API (Testar Retry 3x)
-                </button>
+              {canControlWorker ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleSimulateFailure}
+                    className="px-3 py-2 rounded-md border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold transition"
+                  >
+                    Simular Erro na API (Testar Retry 3x)
+                  </button>
 
-                <button
-                  onClick={handleRunWorkerNow}
-                  disabled={submitting['worker']}
-                  className="px-4 py-2 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-semibold shadow flex items-center gap-1.5 transition"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${submitting['worker'] ? 'animate-spin' : ''}`} />
-                  {submitting['worker'] ? 'Executando…' : 'Executar Ciclo do Worker Agora'}
-                </button>
-              </div>
+                  <button
+                    onClick={handleRunWorkerNow}
+                    disabled={submitting['worker']}
+                    className="px-4 py-2 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-semibold shadow flex items-center gap-1.5 transition"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${submitting['worker'] ? 'animate-spin' : ''}`} />
+                    {submitting['worker'] ? 'Executando…' : 'Executar Ciclo do Worker Agora'}
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs text-stone-500">Disponível para contas de Profissional.</p>
+              )}
             </div>
 
             {workerStats && (
