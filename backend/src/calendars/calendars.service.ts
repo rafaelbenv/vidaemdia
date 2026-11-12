@@ -165,6 +165,9 @@ export class CalendarsService {
         canCreate: perm.canCreate,
         canUpdate: perm.canUpdate,
         canCancel: perm.canCancel,
+        granteeUserId: secretary.id,
+        granteeName: secretary.name,
+        granteeEmail: secretary.email,
       },
       ipAddress,
     });
@@ -178,6 +181,11 @@ export class CalendarsService {
     if (calendar.ownerId !== ownerId) {
       throw new ForbiddenException('Apenas o proprietário da agenda pode revogar permissões RBAC');
     }
+
+    const granteeUser = await this.prisma.user.findUnique({
+      where: { id: granteeUserId },
+      select: { name: true, email: true },
+    });
 
     await this.prisma.calendarPermission.delete({
       where: {
@@ -195,6 +203,11 @@ export class CalendarsService {
       entityId: granteeUserId,
       action: 'CANCEL',
       details: `Permissão RBAC revogada na agenda "${calendar.name}".`,
+      metadata: {
+        granteeUserId,
+        granteeName: granteeUser?.name,
+        granteeEmail: granteeUser?.email,
+      },
       ipAddress,
     });
 
