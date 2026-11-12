@@ -22,6 +22,7 @@ import {
   simulateFailure,
   sendBotMessage,
   unlinkTelegram,
+  updateAppointment,
   verifyCalendarAccess,
 } from './api';
 import {
@@ -29,18 +30,21 @@ import {
   AuditLogEntry,
   Calendar,
   ChatMessage,
+  CreateAppointmentBody,
   DispatchedMessageLog,
   HealthData,
   ProfessionalDirectoryEntry,
   Reminder,
+  UpdateAppointmentBody,
   User,
   WorkerStats,
 } from './types';
 import {
-  checkIsPast,
   formatApptDateTime,
   getErrorMessageByStatus,
 } from './lib/format';
+import { toDateKey } from './lib/dates';
+import { formatRemindSuffix } from './lib/reminderText';
 import {
   AGENDA_PATH,
   COMPARTILHAR_PATH,
@@ -50,7 +54,6 @@ import {
   sectionFromPath,
 } from './lib/routes';
 import { useUserMenu } from './hooks/useUserMenu';
-import { useAppointmentForm } from './hooks/useAppointmentForm';
 import { useTelegramLink } from './hooks/useTelegramLink';
 import { ConfirmDialog, ConfirmModalProps } from './components/ConfirmDialog';
 import { FeedbackBanner } from './components/FeedbackBanner';
@@ -58,6 +61,7 @@ import { UserMenu } from './components/UserMenu';
 import { SessionLoading } from './components/SessionLoading';
 import { SessionLoadError } from './components/SessionLoadError';
 import { BastidoresLayout } from './components/BastidoresLayout';
+import { AppointmentFormValues, AppointmentPanel } from './components/agenda/AppointmentPanel';
 import { LoginPage } from './pages/LoginPage';
 import { AgendaPage } from './pages/AgendaPage';
 import { CompartilharPage } from './pages/CompartilharPage';
@@ -180,6 +184,7 @@ export function App() {
       loadingKey: key,
       onConfirm: async () => {
         await handleCancelAppointment(appt.id);
+        setPanel(null);
         setConfirmModal(null);
       },
     });
@@ -221,23 +226,30 @@ export function App() {
   const [dispatchedMessages, setDispatchedMessages] = useState<DispatchedMessageLog[]>([]);
   const [healthData, setHealthData] = useState<HealthData | null>(null);
 
-  // Form State (Fluxo Principal - Etapa 3)
-  const {
-    formTitle,
-    setFormTitle,
-    formDate,
-    setFormDate,
-    formTime,
-    setFormTime,
-    formDesc,
-    setFormDesc,
-    formReminderMinutes,
-    setFormReminderMinutes,
-    formChannel,
-    setFormChannel,
-    dateError,
-    setDateError,
-  } = useAppointmentForm();
+  // Painel de Compromisso (Criar / Editar)
+  const [panel, setPanel] = useState<
+    | { mode: 'create'; date?: string }
+    | { mode: 'edit'; appointmentId: string }
+    | null
+  >(null);
+  const [panelSaving, setPanelSaving] = useState(false);
+  const [panelError, setPanelError] = useState<string | null>(null);
+
+  function openNewAppointment(date?: string) {
+    setPanel({ mode: 'create', date });
+    setPanelError(null);
+  }
+
+  function openEditAppointment(appt: Appointment) {
+    setPanel({ mode: 'edit', appointmentId: appt.id });
+    setPanelError(null);
+  }
+
+  function closePanel() {
+    setPanel(null);
+    setPanelError(null);
+  }
+
   const [feedbackBanner, setFeedbackBanner] = useState<{
     type: 'success' | 'error';
     title: string;
@@ -515,56 +527,76 @@ export function App() {
     }
   }
 
-  // Etapa 4 do Fluxo Principal: Submete formulário -> POST /compromissos (com JWT no header)
-  async function handleCreateAppointment(e: React.FormEvent) {
-    e.preventDefault();
-    if (submitting['saveAppt']) return;
-    if (!token || !selectedCalendarId) return;
-
-    if (checkIsPast(formDate, formTime)) {
-      setDateError('A data e horário do compromisso não podem estar no passado.');
-      return;
-    }
-
-    setFeedbackBanner(null);
-    setSubmittingKey('saveAppt', true);
+  async function handleSaveAppointment(values: AppointmentFormValues) {
+    if (!token || !panel || !selectedCalendarId) return;
+    setPanelSaving(true);
+    setPanelError(null);
 
     try {
-      const startIso = new Date(`${formDate}T${formTime}:00`).toISOString();
-      await createAppointment(
-        token,
-        {
+      const start = new Date(`${values.date}T${values.time}`);
+      const end = values.endTime ? new Date(`${values.date}T${values.endTime}`) : undefined;
+
+      let savedAppt: Appointment;
+
+      if (panel.mode === 'create') {
+        const body: CreateAppointmentBody = {
           calendarId: selectedCalendarId,
-          title: formTitle,
-          description: formDesc || undefined,
-          startTime: startIso,
-          reminderMinutesBefore: Number(formReminderMinutes),
-          reminderChannel: formChannel,
-        },
-      );
+          title: values.title.trim(),
+          description: values.description.trim() || undefined,
+          startTime: start.toISOString(),
+          endTime: end ? end.toISOString() : undefined,
+          reminderEnabled: values.reminder !== 'none',
+          reminderMinutesBefore: values.reminder === 'none' ? undefined : Number(values.reminder),
+          reminderChannel: 'TELEGRAM',
+        };
+        savedAppt = await createAppointment(token, body);
+      } else {
+        const body: UpdateAppointmentBody = {
+          title: values.title.trim(),
+          description: values.description.trim() === '' ? '' : values.description.trim(),
+          startTime: start.toISOString(),
+          reminderEnabled: values.reminder !== 'none',
+          reminderMinutesBefore: values.reminder === 'none' ? undefined : Number(values.reminder),
+          reminderChannel: 'TELEGRAM',
+        };
+        if (end) {
+          body.endTime = end.toISOString();
+        }
+        savedAppt = await updateAppointment(token, panel.appointmentId, body);
+      }
 
-      setFormTitle('');
-      setFormDesc('');
-      setDateError(null);
-      setFeedbackBanner({
-        type: 'success',
-        title: 'Compromisso salvo. Lembrete no Telegram 15 min antes.',
-        detail: '201 Created — PostgreSQL',
-      });
-
+      setPanel(null);
+      setPanelError(null);
       await loadAppointments(selectedCalendarId);
       if (section !== null) {
         await loadBastidoresData(token);
       }
+
+      const isOwnCal = activeCalendar ? activeCalendar.ownerId === user?.id : true;
+      let bannerTitle = '';
+      let bannerDetail: string | undefined = undefined;
+
+      if (savedAppt.reminders && savedAppt.reminders.length > 0 && values.reminder !== 'none') {
+        const suffix = formatRemindSuffix(savedAppt.reminders[0].remindAt, savedAppt.startTime);
+        bannerTitle = `Compromisso salvo. Lembrete ${suffix}.`;
+        if (isOwnCal && !telegramLinked) {
+          bannerDetail = 'Conecte o Telegram para receber o lembrete.';
+        }
+      } else {
+        bannerTitle = 'Compromisso salvo. Sem lembrete.';
+      }
+
+      setFeedbackBanner({
+        type: 'success',
+        title: bannerTitle,
+        detail: bannerDetail,
+      });
     } catch (err: unknown) {
       const status = errorStatus(err);
-      setFeedbackBanner({
-        type: 'error',
-        title: getErrorMessageByStatus(status),
-        detail: `${status || 400} — ${errorMessage(err)}`,
-      });
+      const msg = status === 403 ? getErrorMessageByStatus(403) : errorMessage(err);
+      setPanelError(msg);
     } finally {
-      setSubmittingKey('saveAppt', false);
+      setPanelSaving(false);
     }
   }
 
@@ -798,6 +830,19 @@ export function App() {
   const allAccessibleCalendars = [...ownedCalendars, ...delegatedCalendars];
   const activeCalendar = allAccessibleCalendars.find((c) => c.id === selectedCalendarId);
 
+  const isOwnerOrAdmin = activeCalendar
+    ? activeCalendar.ownerId === user.id || user.role === 'ADMIN'
+    : false;
+  const canCreateAppt = isOwnerOrAdmin
+    ? true
+    : Boolean(activeCalendar?.myPermissions?.canCreate);
+  const canUpdateAppt = isOwnerOrAdmin
+    ? true
+    : Boolean(activeCalendar?.myPermissions?.canUpdate);
+  const canCancelAppt = isOwnerOrAdmin
+    ? true
+    : Boolean(activeCalendar?.myPermissions?.canCancel);
+
   const userInitials = user.name
     ? user.name
         .split(' ')
@@ -946,33 +991,47 @@ export function App() {
             selectedCalendarId={selectedCalendarId}
             setSelectedCalendarId={setSelectedCalendarId}
             user={user}
-            formTitle={formTitle}
-            setFormTitle={setFormTitle}
-            formDate={formDate}
-            setFormDate={setFormDate}
-            formTime={formTime}
-            setFormTime={setFormTime}
-            dateError={dateError}
-            setDateError={setDateError}
-            formDesc={formDesc}
-            setFormDesc={setFormDesc}
-            formChannel={formChannel}
-            setFormChannel={setFormChannel}
-            formReminderMinutes={formReminderMinutes}
-            setFormReminderMinutes={setFormReminderMinutes}
-            submitting={submitting}
-            handleCreateAppointment={handleCreateAppointment}
             activeCalendar={activeCalendar}
-            loadAppointments={loadAppointments}
+            canCreate={canCreateAppt}
             loadingAppointments={loadingAppointments}
             appointments={appointments}
-            openCancelDialog={openCancelDialog}
-            maxRetries={workerStats?.maxRetries ?? 3}
+            onOpenAppointment={openEditAppointment}
+            onNewAppointment={openNewAppointment}
             telegramLinked={telegramLinked}
             onConnectTelegram={handleConnectTelegram}
           />
         )}
       </main>
+
+      {panel !== null && activeCalendar && (
+        <AppointmentPanel
+          key={panel.mode === 'edit' ? panel.appointmentId : `create-${panel.date || 'default'}`}
+          mode={panel.mode}
+          appointment={
+            panel.mode === 'edit'
+              ? appointments.find((a) => a.id === panel.appointmentId)
+              : undefined
+          }
+          calendar={activeCalendar}
+          defaultDate={
+            (panel.mode === 'create' && panel.date) ||
+            new URLSearchParams(location.search).get('dia') ||
+            toDateKey(new Date())
+          }
+          canEdit={panel.mode === 'create' ? canCreateAppt : canUpdateAppt}
+          canCancel={canCancelAppt}
+          saving={panelSaving}
+          serverError={panelError}
+          onClose={closePanel}
+          onSubmit={handleSaveAppointment}
+          onRequestCancel={() => {
+            if (panel.mode === 'edit') {
+              const appt = appointments.find((a) => a.id === panel.appointmentId);
+              if (appt) openCancelDialog(appt);
+            }
+          }}
+        />
+      )}
 
       {confirmDialogElement}
     </div>

@@ -235,6 +235,17 @@ export interface CreateAppointmentBody {
   startTime: string;
   endTime?: string;
   reminderMinutesBefore?: number;
+  reminderEnabled?: boolean;
+  reminderChannel?: NotificationChannel;
+}
+
+export interface UpdateAppointmentBody {
+  title?: string;
+  description?: string;
+  startTime?: string;
+  endTime?: string;
+  reminderMinutesBefore?: number;
+  reminderEnabled?: boolean;
   reminderChannel?: NotificationChannel;
 }
 

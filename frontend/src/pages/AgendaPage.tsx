@@ -1,10 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import {
   Appointment,
   Calendar,
-  NotificationChannel,
   User,
 } from '../types';
 import {
@@ -15,35 +14,18 @@ import {
 } from '../lib/dates';
 import { WeekStrip } from '../components/agenda/WeekStrip';
 import { DayList } from '../components/agenda/DayList';
-import { AppointmentForm } from '../components/agenda/AppointmentForm';
 
 export interface AgendaPageProps {
   allAccessibleCalendars: Calendar[];
   selectedCalendarId: string;
   setSelectedCalendarId: (id: string) => void;
   user: User;
-  formTitle: string;
-  setFormTitle: (val: string) => void;
-  formDate: string;
-  setFormDate: (val: string) => void;
-  formTime: string;
-  setFormTime: (val: string) => void;
-  dateError: string | null;
-  setDateError: (err: string | null) => void;
-  formDesc: string;
-  setFormDesc: (val: string) => void;
-  formChannel: NotificationChannel;
-  setFormChannel: (channel: NotificationChannel) => void;
-  formReminderMinutes: number;
-  setFormReminderMinutes: (mins: number) => void;
-  submitting: Record<string, boolean>;
-  handleCreateAppointment: (e: React.FormEvent) => Promise<void>;
   activeCalendar?: Calendar;
-  loadAppointments?: (calendarId: string) => Promise<void>;
+  canCreate: boolean;
   loadingAppointments: boolean;
   appointments: Appointment[];
-  openCancelDialog: (appt: Appointment) => void;
-  maxRetries?: number;
+  onOpenAppointment: (appt: Appointment) => void;
+  onNewAppointment: (date?: string) => void;
   telegramLinked?: boolean;
   onConnectTelegram: () => void;
 }
@@ -53,31 +35,16 @@ export function AgendaPage({
   selectedCalendarId,
   setSelectedCalendarId,
   user,
-  formTitle,
-  setFormTitle,
-  formDate,
-  setFormDate,
-  formTime,
-  setFormTime,
-  dateError,
-  setDateError,
-  formDesc,
-  setFormDesc,
-  formChannel,
-  setFormChannel,
-  formReminderMinutes,
-  setFormReminderMinutes,
-  submitting,
-  handleCreateAppointment,
   activeCalendar,
+  canCreate,
   loadingAppointments,
   appointments,
-  openCancelDialog,
+  onOpenAppointment,
+  onNewAppointment,
   telegramLinked,
   onConnectTelegram,
 }: AgendaPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [showForm, setShowForm] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
   // now: estado atualizado a cada 60 s para os marcadores
@@ -98,20 +65,8 @@ export function AgendaPage({
   };
 
   const handleOpenNew = () => {
-    setFormDate(toDateKey(selectedDate));
-    setShowForm(true);
+    onNewAppointment(toDateKey(selectedDate));
   };
-
-  // Fecha o formulário automaticamente após salvar com sucesso
-  const isSaving = Boolean(submitting['saveAppt']);
-  const prevSavingRef = useRef(false);
-
-  useEffect(() => {
-    if (prevSavingRef.current && !isSaving && !dateError && formTitle === '') {
-      setShowForm(false);
-    }
-    prevSavingRef.current = isSaving;
-  }, [isSaving, dateError, formTitle]);
 
   const ownedCalendars = useMemo(
     () => allAccessibleCalendars.filter((c) => c.ownerId === user.id),
@@ -223,13 +178,15 @@ export function AgendaPage({
           >
             <ChevronRight className="w-4 h-4" />
           </button>
-          <button
-            type="button"
-            onClick={handleOpenNew}
-            className="hidden sm:inline-flex items-center gap-1.5 bg-brand-700 hover:bg-brand-800 text-white rounded-md px-3 py-2 text-sm font-medium transition"
-          >
-            + Novo compromisso
-          </button>
+          {canCreate && (
+            <button
+              type="button"
+              onClick={handleOpenNew}
+              className="hidden sm:inline-flex items-center gap-1.5 bg-brand-700 hover:bg-brand-800 text-white rounded-md px-3 py-2 text-sm font-medium transition"
+            >
+              + Novo compromisso
+            </button>
+          )}
         </div>
       </div>
 
@@ -242,32 +199,7 @@ export function AgendaPage({
         />
       </div>
 
-      {/* 4. Formulário (temporário) */}
-      {showForm && (
-        <div className="mt-4">
-          <AppointmentForm
-            formTitle={formTitle}
-            setFormTitle={setFormTitle}
-            formDate={formDate}
-            setFormDate={setFormDate}
-            formTime={formTime}
-            setFormTime={setFormTime}
-            dateError={dateError}
-            setDateError={setDateError}
-            formDesc={formDesc}
-            setFormDesc={setFormDesc}
-            formChannel={formChannel}
-            setFormChannel={setFormChannel}
-            formReminderMinutes={formReminderMinutes}
-            setFormReminderMinutes={setFormReminderMinutes}
-            submitting={submitting}
-            handleCreateAppointment={handleCreateAppointment}
-            onClose={() => setShowForm(false)}
-          />
-        </div>
-      )}
-
-      {/* 5. Lista do dia */}
+      {/* 4. Lista do dia */}
       <div className="bg-white rounded-lg border border-stone-200 px-4 mt-4">
         {loadingAppointments ? (
           <div className="py-6 text-center text-sm text-stone-500">
@@ -281,23 +213,25 @@ export function AgendaPage({
             ownerId={activeCalendar?.ownerId ?? user.id}
             ownerTelegramLinked={ownerTelegramLinked}
             isOwnCalendar={isOwnCalendar}
+            canCreate={canCreate}
             onConnectTelegram={onConnectTelegram}
-            onCancel={openCancelDialog}
-            submitting={submitting}
+            onOpen={onOpenAppointment}
             onNew={handleOpenNew}
           />
         )}
       </div>
 
-      {/* 6. Celular: botão flutuante */}
-      <button
-        type="button"
-        onClick={handleOpenNew}
-        aria-label="Novo compromisso"
-        className="sm:hidden fixed bottom-5 right-5 w-14 h-14 rounded-full bg-brand-700 hover:bg-brand-800 text-white shadow-lg flex items-center justify-center transition z-20"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
+      {/* 5. Celular: botão flutuante */}
+      {canCreate && (
+        <button
+          type="button"
+          onClick={handleOpenNew}
+          aria-label="Novo compromisso"
+          className="sm:hidden fixed bottom-5 right-5 w-14 h-14 rounded-full bg-brand-700 hover:bg-brand-800 text-white shadow-lg flex items-center justify-center transition z-20"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      )}
     </div>
   );
 }

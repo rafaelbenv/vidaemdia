@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, Trash2 } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { Appointment } from '../../types';
 import { formatTime } from '../../lib/dates';
 import { reminderLine } from '../../lib/reminderText';
@@ -11,8 +11,7 @@ export interface AppointmentRowProps {
   reminder: ReturnType<typeof reminderLine>;
   createdByOther: string | null;
   onConnectTelegram: () => void;
-  onCancel: () => void;
-  cancelling: boolean;
+  onOpen: (appt: Appointment) => void;
 }
 
 export function AppointmentRow({
@@ -22,8 +21,7 @@ export function AppointmentRow({
   reminder,
   createdByOther,
   onConnectTelegram,
-  onCancel,
-  cancelling,
+  onOpen,
 }: AppointmentRowProps) {
   const isCancelled = appt.status === 'CANCELLED';
 
@@ -39,7 +37,18 @@ export function AppointmentRow({
     : 'text-sm font-medium text-stone-900 truncate';
 
   return (
-    <div className="flex gap-4 py-3 border-b border-stone-100 last:border-0 items-center">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(appt)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen(appt);
+        }
+      }}
+      className="w-full text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 rounded-md py-3 px-2 -mx-2 border-b border-stone-100 last:border-0 hover:bg-stone-50/70 transition-colors flex gap-4 items-center"
+    >
       {/* Esquerda */}
       <div className="w-14 shrink-0">
         <span className={timeClass}>{formatTime(appt.startTime)}</span>
@@ -75,7 +84,10 @@ export function AppointmentRow({
                 {reminder.tone === 'action' && (
                   <button
                     type="button"
-                    onClick={onConnectTelegram}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onConnectTelegram();
+                    }}
                     className="text-brand-700 underline hover:text-brand-800 cursor-pointer text-left"
                   >
                     {reminder.text}
@@ -93,19 +105,6 @@ export function AppointmentRow({
           </div>
         )}
       </div>
-
-      {/* Direita */}
-      {!isCancelled && (
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={cancelling}
-          aria-label="Cancelar compromisso"
-          className="text-stone-400 hover:text-red-600 p-2 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      )}
     </div>
   );
 }

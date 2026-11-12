@@ -11,9 +11,9 @@ export interface DayListProps {
   ownerId: string;
   ownerTelegramLinked: boolean;
   isOwnCalendar?: boolean;
+  canCreate?: boolean;
   onConnectTelegram: () => void;
-  onCancel: (a: Appointment) => void;
-  submitting: Record<string, boolean>;
+  onOpen: (a: Appointment) => void;
   onNew: () => void;
 }
 
@@ -24,9 +24,9 @@ export function DayList({
   ownerId,
   ownerTelegramLinked,
   isOwnCalendar = true,
+  canCreate = true,
   onConnectTelegram,
-  onCancel,
-  submitting,
+  onOpen,
   onNew,
 }: DayListProps) {
   const [showCancelled, setShowCancelled] = useState(false);
@@ -97,8 +97,7 @@ export function DayList({
                     : null
                 }
                 onConnectTelegram={onConnectTelegram}
-                onCancel={() => onCancel(appt)}
-                cancelling={Boolean(submitting[`cancelAppt:${appt.id}`])}
+                onOpen={onOpen}
               />
             ))}
           </div>
@@ -116,13 +115,15 @@ export function DayList({
         <p className="text-sm text-stone-600">
           Nada marcado para {dateLower}.
         </p>
-        <button
-          type="button"
-          onClick={onNew}
-          className="border border-stone-300 rounded-md px-3 py-2 text-sm text-stone-700 hover:bg-stone-50 font-medium transition mt-3"
-        >
-          Novo compromisso
-        </button>
+        {canCreate && (
+          <button
+            type="button"
+            onClick={onNew}
+            className="border border-stone-300 rounded-md px-3 py-2 text-sm text-stone-700 hover:bg-stone-50 font-medium transition mt-3"
+          >
+            Novo compromisso
+          </button>
+        )}
         {renderCancelledSection()}
       </div>
     );
@@ -162,8 +163,7 @@ export function DayList({
               reminder={reminder}
               createdByOther={createdByOther}
               onConnectTelegram={onConnectTelegram}
-              onCancel={() => onCancel(appt)}
-              cancelling={Boolean(submitting[`cancelAppt:${appt.id}`])}
+              onOpen={onOpen}
             />
           );
         })}

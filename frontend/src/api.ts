@@ -15,6 +15,7 @@ import {
   TelegramLinkResponse,
   TelegramStatus,
   TelegramUnlinkResponse,
+  UpdateAppointmentBody,
   User,
   VerifyAccessResponse,
 } from './types';
@@ -136,6 +137,21 @@ export async function createAppointment(
     '/compromissos',
     {
       method: 'POST',
+      body: JSON.stringify(body),
+    },
+    token,
+  );
+}
+
+export async function updateAppointment(
+  token: string,
+  id: string,
+  body: UpdateAppointmentBody,
+): Promise<Appointment> {
+  return apiRequest<Appointment>(
+    `/compromissos/${id}`,
+    {
+      method: 'PATCH',
       body: JSON.stringify(body),
     },
     token,

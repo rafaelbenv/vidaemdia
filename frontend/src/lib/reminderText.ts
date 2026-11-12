@@ -11,7 +11,7 @@ export interface ReminderLineResult {
   tone: 'muted' | 'danger' | 'action';
 }
 
-function formatRemindSuffix(targetIso: string, startIso: string): string {
+export function formatRemindSuffix(targetIso: string, startIso: string): string {
   const targetDate = new Date(targetIso);
   const startDate = new Date(startIso);
   if (isSameDay(targetDate, startDate)) {
