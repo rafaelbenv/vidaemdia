@@ -34,6 +34,7 @@ enum AppointmentStatus {
 
 enum ReminderStatus {
   PENDING
+  PROCESSING
   SENT
   FAILED
 }
@@ -127,6 +128,8 @@ model Reminder {
   nextRetryAt   DateTime?           @map("next_retry_at")
   lastError     String?             @map("last_error")
   sentAt        DateTime?           @map("sent_at")
+  claimedAt     DateTime?           @map("claimed_at")
+  claimedBy     String?             @map("claimed_by")
   createdAt     DateTime            @default(now()) @map("created_at")
   updatedAt     DateTime            @updatedAt @map("updated_at")
 

@@ -35,6 +35,10 @@ export function reminderLine(
     return { text: 'Lembrete falhou', tone: 'danger' };
   }
 
+  if (reminder.status === 'PROCESSING') {
+    return { text: 'Enviando lembrete…', tone: 'muted' };
+  }
+
   if (reminder.status === 'SENT') {
     const rawTime = reminder.sentAt ?? reminder.remindAt;
     const suffix = formatRemindSuffix(rawTime, appt.startTime);

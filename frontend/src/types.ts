@@ -2,7 +2,7 @@ export type UserRole = 'USER' | 'PROFESSIONAL' | 'SECRETARY' | 'ADMIN';
 export type NotificationChannel = 'WHATSAPP' | 'TELEGRAM' | 'BOTH';
 export type CalendarType = 'PERSONAL' | 'PROFESSIONAL';
 export type AppointmentStatus = 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
-export type ReminderStatus = 'PENDING' | 'SENT' | 'FAILED';
+export type ReminderStatus = 'PENDING' | 'PROCESSING' | 'SENT' | 'FAILED';
 
 export interface User {
   id: string;
@@ -62,6 +62,8 @@ export interface Reminder {
   nextRetryAt?: string | null;
   lastError?: string | null;
   sentAt?: string | null;
+  claimedAt?: string | null;
+  claimedBy?: string | null;
   appointment?: {
     id: string;
     title: string;
@@ -243,6 +245,7 @@ export interface RunWorkerResponse {
   sent?: number;
   retried?: number;
   failedPermanently?: number;
+  skipped?: number;
   message: string;
 }
 

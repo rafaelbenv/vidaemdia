@@ -130,6 +130,8 @@ export function LembretesPage({
                           ? 'bg-emerald-100 text-emerald-800'
                           : rem.status === 'FAILED'
                           ? 'bg-red-100 text-red-800'
+                          : rem.status === 'PROCESSING'
+                          ? 'bg-sky-100 text-sky-800'
                           : 'bg-amber-100 text-amber-800'
                       }`}
                     >
@@ -137,6 +139,8 @@ export function LembretesPage({
                         ? 'ENVIADO NO POSTGRESQL'
                         : rem.status === 'FAILED'
                         ? `FALHOU (MÁX ${workerStats?.maxRetries ?? 3} TENTATIVAS)`
+                        : rem.status === 'PROCESSING'
+                        ? 'ENVIANDO'
                         : 'PENDENTE NA JANELA'}
                     </span>
                   </div>

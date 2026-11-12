@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { AppointmentStatus, ReminderStatus } from '@prisma/client';
+import * as os from 'os';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationProvider } from './notification.provider';
 import { MetricsService } from '../monitoring/metrics.service';
@@ -9,6 +10,7 @@ import { escapeHtml } from '../telegram/telegram.service';
 @Injectable()
 export class NotificationWorker {
   private readonly logger = new Logger(NotificationWorker.name);
+  private readonly instanceId = `${os.hostname()}-${process.pid}`;
   private isRunning = false;
   private lastRunAt: string | null = null;
   private totalCycles = 0;
@@ -42,7 +44,7 @@ export class NotificationWorker {
   @Cron(process.env.WORKER_CRON_EXPRESSION || '*/1 * * * *')
   async processPendingReminders() {
     if (this.isRunning) {
-      return { processed: 0, message: 'Worker já está em execução neste momento' };
+      return { processed: 0, skipped: 0, message: 'Worker já está em execução neste momento' };
     }
 
     this.isRunning = true;
@@ -51,6 +53,23 @@ export class NotificationWorker {
     const maxRetries = Number(process.env.MAX_REMINDER_RETRIES || 3);
 
     try {
+      // Recuperar reservas esquecidas (processo caiu no meio)
+      const staleThreshold = new Date(Date.now() - 5 * 60 * 1000);
+      const recovered = await this.prisma.reminder.updateMany({
+        where: {
+          status: ReminderStatus.PROCESSING,
+          claimedAt: { lt: staleThreshold },
+        },
+        data: {
+          status: ReminderStatus.PENDING,
+          claimedAt: null,
+          claimedBy: null,
+        },
+      });
+      if (recovered.count > 0) {
+        this.logger.warn(`Recuperados ${recovered.count} lembrete(s) com reserva esquecida.`);
+      }
+
       const now = new Date();
 
       const pendingReminders = await this.prisma.reminder.findMany({
@@ -84,6 +103,7 @@ export class NotificationWorker {
           sent: 0,
           retried: 0,
           failedPermanently: 0,
+          skipped: 0,
           message: 'Nenhum lembrete pendente na janela atual -> aguardando próximo ciclo.',
         };
       }
@@ -91,8 +111,26 @@ export class NotificationWorker {
       let sentCount = 0;
       let retriedCount = 0;
       let failedPermanentlyCount = 0;
+      let skippedCount = 0;
 
       for (const reminder of pendingReminders) {
+        const claim = await this.prisma.reminder.updateMany({
+          where: {
+            id: reminder.id,
+            status: ReminderStatus.PENDING,
+            OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: now } }],
+          },
+          data: {
+            status: ReminderStatus.PROCESSING,
+            claimedAt: new Date(),
+            claimedBy: this.instanceId,
+          },
+        });
+        if (claim.count === 0) {
+          skippedCount++;
+          continue; // outra instância pegou
+        }
+
         const appt = reminder.appointment;
         const owner = appt.calendar.owner;
 
@@ -115,15 +153,24 @@ export class NotificationWorker {
           (appt.description ? `📝 <i>${escapeHtml(appt.description)}</i>\n` : '') +
           `📂 Agenda: ${escapeHtml(appt.calendar.name)}`;
 
-        const result = await this.notificationProvider.sendReminderMessage({
-          reminderId: reminder.id,
-          appointmentId: appt.id,
-          channel: reminder.channel,
-          recipientName: owner.name,
-          phoneWhatsapp: owner.phoneWhatsapp,
-          telegramChatId: owner.telegramChatId,
-          messageText,
-        });
+        let result: { success: boolean; error?: string };
+        try {
+          result = await this.notificationProvider.sendReminderMessage({
+            reminderId: reminder.id,
+            appointmentId: appt.id,
+            channel: reminder.channel,
+            recipientName: owner.name,
+            phoneWhatsapp: owner.phoneWhatsapp,
+            telegramChatId: owner.telegramChatId,
+            messageText,
+          });
+        } catch (error: unknown) {
+          const err = error as Error | undefined;
+          result = {
+            success: false,
+            error: err?.message || 'Exceção ao disparar mensagem',
+          };
+        }
 
         if (result.success) {
           await this.prisma.reminder.update({
@@ -132,6 +179,8 @@ export class NotificationWorker {
               status: ReminderStatus.SENT,
               sentAt: new Date(),
               lastError: null,
+              claimedAt: null,
+              claimedBy: null,
             },
           });
           sentCount++;
@@ -149,6 +198,8 @@ export class NotificationWorker {
               status: exhausted ? ReminderStatus.FAILED : ReminderStatus.PENDING,
               nextRetryAt,
               lastError: result.error || 'Falha no envio para API de mensageria',
+              claimedAt: null,
+              claimedBy: null,
             },
           });
 
@@ -167,17 +218,23 @@ export class NotificationWorker {
         }
       }
 
+      let message = `Ciclo concluído: ${sentCount} enviado(s), ${retriedCount} agendado(s) para retry, ${failedPermanentlyCount} falha(s) definitiva(s)`;
+      if (skippedCount > 0) {
+        message += `, ${skippedCount} reservado(s) por outra instância`;
+      }
+      message += '.';
+
       return {
         cycle: this.totalCycles,
         processed: pendingReminders.length,
         sent: sentCount,
         retried: retriedCount,
         failedPermanently: failedPermanentlyCount,
-        message: `Ciclo concluído: ${sentCount} enviado(s), ${retriedCount} agendado(s) para retry, ${failedPermanentlyCount} falha(s) definitiva(s).`,
+        skipped: skippedCount,
+        message,
       };
     } finally {
       this.isRunning = false;
     }
   }
 }
-
