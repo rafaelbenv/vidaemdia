@@ -184,6 +184,18 @@ export async function grantPermission(
   );
 }
 
+export async function revokePermission(
+  token: string,
+  calendarId: string,
+  granteeUserId: string,
+): Promise<{ revoked: boolean }> {
+  return apiRequest<{ revoked: boolean }>(
+    `/agendas/${calendarId}/permissoes/${granteeUserId}`,
+    { method: 'DELETE' },
+    token,
+  );
+}
+
 export async function runWorkerNow(token: string): Promise<RunWorkerResponse> {
   return apiRequest<RunWorkerResponse>('/notificacoes/executar-worker', { method: 'POST' }, token);
 }

@@ -17,6 +17,7 @@ import {
   getTelegramStatus,
   grantPermission,
   login,
+  revokePermission,
   runWorkerNow,
   setUnauthorizedHandler,
   simulateFailure,
@@ -29,6 +30,7 @@ import {
   Appointment,
   AuditLogEntry,
   Calendar,
+  CalendarPermission,
   ChatMessage,
   CreateAppointmentBody,
   DispatchedMessageLog,
@@ -298,9 +300,6 @@ export function App() {
       return () => window.clearTimeout(timer);
     }
   }, [feedbackBanner]);
-
-  // Grant RBAC Permission Form (Profissional -> Secretária)
-  const [secretaryEmailToGrant, setSecretaryEmailToGrant] = useState('secretaria.maria@vidaemdia.com.br');
 
   // Chatbot Interactive State
   const [botInput, setBotInput] = useState('');
@@ -704,40 +703,66 @@ export function App() {
     }
   }
 
-  async function handleGrantSecretaryPermission(e: React.FormEvent) {
-    e.preventDefault();
-    if (submitting['grant']) return;
-    if (!token || !selectedCalendarId) return;
-    setSubmittingKey('grant', true);
-
+  async function handleGrantAccess(
+    email: string,
+    caps: { canView: boolean; canCreate: boolean; canUpdate: boolean; canCancel: boolean },
+  ): Promise<string | null> {
+    if (!token || !selectedCalendarId) {
+      return 'Sessão inválida ou agenda não selecionada.';
+    }
     try {
-      await grantPermission(
-        token,
-        selectedCalendarId,
-        {
-          secretaryEmail: secretaryEmailToGrant,
-          canView: true,
-          canCreate: true,
-          canUpdate: true,
-          canCancel: true,
-        },
-      );
-      setFeedbackBanner({
-        type: 'success',
-        title: `Permissão concedida para ${secretaryEmailToGrant}!`,
-        detail: '200 OK — Permissão RBAC concedida',
+      await grantPermission(token, selectedCalendarId, {
+        secretaryEmail: email,
+        canView: caps.canView,
+        canCreate: caps.canCreate,
+        canUpdate: caps.canUpdate,
+        canCancel: caps.canCancel,
       });
       await loadSession(token);
+      return null;
     } catch (err: unknown) {
-      const status = errorStatus(err);
-      setFeedbackBanner({
-        type: 'error',
-        title: getErrorMessageByStatus(status),
-        detail: `${status || 400} — ${errorMessage(err)}`,
-      });
-    } finally {
-      setSubmittingKey('grant', false);
+      return errorMessage(err, 'Não foi possível conceder ou atualizar o acesso.');
     }
+  }
+
+  function handleRevokeAccess(perm: CalendarPermission) {
+    const grantee = perm.granteeUser;
+    const name = grantee?.name || grantee?.email || 'Usuário';
+    const granteeId = grantee?.id;
+    if (!granteeId || !selectedCalendarId || !token) return;
+
+    const key = `revoke:${granteeId}`;
+    setConfirmModal({
+      title: `Remover o acesso de ${name}?`,
+      message: `${name} deixa de ver e de mexer nesta agenda.`,
+      confirmLabel: 'Remover acesso',
+      confirmLoadingLabel: 'Removendo…',
+      cancelLabel: 'Manter',
+      confirmVariant: 'danger',
+      loadingKey: key,
+      onConfirm: async () => {
+        setSubmittingKey(key, true);
+        try {
+          await revokePermission(token, selectedCalendarId, granteeId);
+          await loadSession(token);
+          setFeedbackBanner({
+            type: 'success',
+            title: `Acesso de ${name} removido.`,
+          });
+          setConfirmModal(null);
+        } catch (err: unknown) {
+          const status = errorStatus(err);
+          setFeedbackBanner({
+            type: 'error',
+            title: getErrorMessageByStatus(status),
+            detail: `${status || 400} — ${errorMessage(err)}`,
+          });
+          setConfirmModal(null);
+        } finally {
+          setSubmittingKey(key, false);
+        }
+      },
+    });
   }
 
   // Fluxo de Notificação: Executa Ciclo do Worker manualmente
@@ -1023,16 +1048,13 @@ export function App() {
 
       {/* Conteúdo Principal */}
       <main className="max-w-7xl mx-auto w-full px-4 py-6 flex-1">
-        {rawPath === COMPARTILHAR_PATH && canShareSelected ? (
+        {rawPath === COMPARTILHAR_PATH && canShareSelected && activeCalendar ? (
           <CompartilharPage
+            calendar={activeCalendar}
+            me={user}
+            onGrant={handleGrantAccess}
+            onRevoke={handleRevokeAccess}
             onBack={() => navigate(AGENDA_PATH)}
-            selectedCalendarId={selectedCalendarId}
-            setSelectedCalendarId={handleSelectCalendar}
-            ownedCalendars={ownedCalendars}
-            secretaryEmailToGrant={secretaryEmailToGrant}
-            setSecretaryEmailToGrant={setSecretaryEmailToGrant}
-            handleGrantSecretaryPermission={handleGrantSecretaryPermission}
-            submitting={submitting}
           />
         ) : (
           <AgendaPage
