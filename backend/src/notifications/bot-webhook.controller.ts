@@ -1,11 +1,12 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from 'class-validator';
+import { UserRole } from '@prisma/client';
 import { NotificationWorker } from './notification.worker';
 import { NotificationProvider } from './notification.provider';
 import { PrismaService } from '../prisma/prisma.service';
 import { BotService } from './bot.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard, RbacGuard, Roles } from '../auth/jwt-auth.guard';
 
 export class SimulateBotMessageDto {
   @ApiProperty({
@@ -50,8 +51,27 @@ export class BotWebhookController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Retorna status do Worker de Notificações, fila de lembretes e mensagens disparadas no WhatsApp/Telegram' })
-  async getStatus() {
+  async getStatus(@Req() req: any) {
+    const userId = req.user?.sub || req.user?.id;
+    const role = req.user?.role;
+
+    const calendarFilter = {
+      OR: [
+        { ownerId: userId },
+        { permissions: { some: { granteeUserId: userId, canView: true } } },
+      ],
+    };
+
     const reminders = await this.prisma.reminder.findMany({
+      ...(role !== 'ADMIN'
+        ? {
+            where: {
+              appointment: {
+                calendar: calendarFilter,
+              },
+            },
+          }
+        : {}),
       include: {
         appointment: {
           include: {
@@ -63,25 +83,52 @@ export class BotWebhookController {
       take: 50,
     });
 
+    let dispatchedMessages = this.provider.getDispatchedMessages();
+
+    if (role !== 'ADMIN') {
+      const ids = Array.from(
+        new Set(
+          dispatchedMessages
+            .map((m) => m.appointmentId)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      );
+
+      const visibleAppointments = await this.prisma.appointment.findMany({
+        where: {
+          id: { in: ids },
+          calendar: calendarFilter,
+        },
+        select: { id: true },
+      });
+
+      const visibleIds = new Set(visibleAppointments.map((a) => a.id));
+      dispatchedMessages = dispatchedMessages.filter((m) =>
+        visibleIds.has(m.appointmentId),
+      );
+    }
+
     return {
       worker: this.worker.getWorkerStatus(),
       reminders,
-      dispatchedMessages: this.provider.getDispatchedMessages(),
+      dispatchedMessages,
     };
   }
 
   @Post('executar-worker')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RbacGuard)
+  @Roles(UserRole.PROFESSIONAL, UserRole.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Dispara imediatamente um ciclo do Worker de Notificações (sem precisar aguardar os 5 minutos)' })
+  @ApiOperation({ summary: 'Dispara imediatamente um ciclo do Worker de Notificações (sem precisar aguardar os 5 minutos) (Profissional e Admin)' })
   async triggerWorkerNow() {
     return this.worker.processPendingReminders();
   }
 
   @Post('simular-falha')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RbacGuard)
+  @Roles(UserRole.PROFESSIONAL, UserRole.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Configura o simulador para falhar nas próximas N entregas para demonstrar o Retry (máx. 3 tentativas)' })
+  @ApiOperation({ summary: 'Configura o simulador para falhar nas próximas N entregas para demonstrar o Retry (máx. 3 tentativas) (Profissional e Admin)' })
   async simulateFailure(@Body() dto: SimulateFailureDto) {
     return this.provider.setSimulateFailureCount(dto.failCount ?? 1);
   }
