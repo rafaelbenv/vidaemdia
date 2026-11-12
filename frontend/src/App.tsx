@@ -42,6 +42,7 @@ import {
   WorkerStats,
 } from './types';
 import {
+  firstName,
   formatApptDateTime,
   getErrorMessageByStatus,
 } from './lib/format';
@@ -59,7 +60,7 @@ import {
 import { useUserMenu } from './hooks/useUserMenu';
 import { useTelegramLink } from './hooks/useTelegramLink';
 import { ConfirmDialog, ConfirmModalProps } from './components/ConfirmDialog';
-import { FeedbackBanner } from './components/FeedbackBanner';
+import { Toast } from './components/Toast';
 import { UserMenu } from './components/UserMenu';
 import { CalendarMenu } from './components/CalendarMenu';
 import { CalendarBanner } from './components/CalendarBanner';
@@ -294,15 +295,6 @@ export function App() {
     detail?: string;
   } | null>(null);
 
-  useEffect(() => {
-    if (feedbackBanner?.type === 'success') {
-      const timer = window.setTimeout(() => {
-        setFeedbackBanner(null);
-      }, 5000);
-      return () => window.clearTimeout(timer);
-    }
-  }, [feedbackBanner]);
-
   // Chatbot Interactive State
   const [botInput, setBotInput] = useState('');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(getInitialChatHistory);
@@ -434,12 +426,19 @@ export function App() {
       const list = await getAppointments(token, calendarId);
       setAppointments(list);
     } catch (err: unknown) {
-      const status = errorStatus(err) || 500;
-      setFeedbackBanner({
-        type: 'error',
-        title: getErrorMessageByStatus(errorStatus(err)),
-        detail: `${status} — ${errorMessage(err, 'Erro ao carregar compromissos desta agenda')}`,
-      });
+      const status = errorStatus(err);
+      if (status === 403) {
+        setFeedbackBanner({
+          type: 'error',
+          title: getErrorMessageByStatus(403),
+        });
+      } else {
+        setFeedbackBanner({
+          type: 'error',
+          title: getErrorMessageByStatus(status),
+          detail: errorMessage(err, 'Erro ao carregar compromissos desta agenda'),
+        });
+      }
     } finally {
       setLoadingAppointments(false);
     }
@@ -468,8 +467,7 @@ export function App() {
       setUserMenuOpen(false);
       setFeedbackBanner({
         type: 'success',
-        title: `Bem-vindo, ${res.user.name}!`,
-        detail: `Autenticado com sucesso via JWT como ${res.user.name} (${res.user.role})`,
+        title: `Olá, ${firstName(res.user.name)}!`,
       });
     } catch (err: unknown) {
       setAuthError(errorMessage(err, 'Falha na autenticação'));
@@ -525,7 +523,7 @@ export function App() {
             stopPolling();
             setFeedbackBanner({
               type: 'success',
-              title: 'Telegram conectado com sucesso!',
+              title: 'Telegram conectado.',
             });
             await loadSession(token);
           }
@@ -542,11 +540,10 @@ export function App() {
         stopPolling();
       }, maxDuration);
     } catch (err: unknown) {
-      const status = errorStatus(err) || 500;
       setFeedbackBanner({
         type: 'error',
         title: 'Não foi possível conectar o Telegram.',
-        detail: `${status} — ${errorMessage(err, 'Erro ao gerar link de conexão do Telegram')}`,
+        detail: errorMessage(err, 'Erro ao gerar link de conexão do Telegram'),
       });
     } finally {
       setSubmittingKey('telegram', false);
@@ -565,15 +562,14 @@ export function App() {
       setTelegramWaiting(false);
       setFeedbackBanner({
         type: 'success',
-        title: 'Telegram desconectado com sucesso!',
+        title: 'Telegram desconectado.',
       });
       await loadSession(token);
     } catch (err: unknown) {
-      const status = errorStatus(err) || 500;
       setFeedbackBanner({
         type: 'error',
         title: 'Não foi possível desconectar o Telegram.',
-        detail: `${status} — ${errorMessage(err, 'Erro ao desconectar Telegram')}`,
+        detail: errorMessage(err, 'Erro ao desconectar Telegram'),
       });
     } finally {
       setSubmittingKey('telegram', false);
@@ -664,8 +660,7 @@ export function App() {
       await cancelAppointment(token, id);
       setFeedbackBanner({
         type: 'success',
-        title: 'Compromisso cancelado com sucesso.',
-        detail: '200 OK — log de auditoria gravado',
+        title: 'Compromisso cancelado.',
       });
       if (selectedCalendarId) {
         await loadAppointments(selectedCalendarId);
@@ -675,11 +670,18 @@ export function App() {
       }
     } catch (err: unknown) {
       const status = errorStatus(err);
-      setFeedbackBanner({
-        type: 'error',
-        title: getErrorMessageByStatus(status),
-        detail: `${status || 403} — ${errorMessage(err)}`,
-      });
+      if (status === 403) {
+        setFeedbackBanner({
+          type: 'error',
+          title: getErrorMessageByStatus(403),
+        });
+      } else {
+        setFeedbackBanner({
+          type: 'error',
+          title: getErrorMessageByStatus(status),
+          detail: errorMessage(err),
+        });
+      }
     } finally {
       setSubmittingKey(key, false);
     }
@@ -765,7 +767,7 @@ export function App() {
           setFeedbackBanner({
             type: 'error',
             title: getErrorMessageByStatus(status),
-            detail: `${status || 400} — ${errorMessage(err)}`,
+            detail: errorMessage(err),
           });
           setConfirmModal(null);
         } finally {
@@ -949,13 +951,13 @@ export function App() {
     />
   );
 
-  // Banner de feedback reutilizado em ambos os layouts
-  const feedbackBannerElement = feedbackBanner ? (
-    <FeedbackBanner
-      feedbackBanner={feedbackBanner}
-      setFeedbackBanner={setFeedbackBanner}
+  // Toast de feedback reutilizado em ambos os layouts
+  const feedbackToastElement = (
+    <Toast
+      toast={feedbackBanner}
+      onClose={() => setFeedbackBanner(null)}
     />
-  ) : null;
+  );
 
   if (section !== null && SHOW_BASTIDORES) {
     return (
@@ -964,7 +966,7 @@ export function App() {
           section={section}
           userName={user.name}
           onBack={() => navigate(AGENDA_PATH)}
-          feedbackBanner={feedbackBannerElement}
+          feedbackBanner={feedbackToastElement}
         >
           {section === 'lembretes' && (
             <LembretesPage
@@ -1054,8 +1056,8 @@ export function App() {
         <CalendarBanner calendar={activeCalendar} />
       )}
 
-      {/* Banner de Feedback de Operações */}
-      {feedbackBannerElement}
+      {/* Toast de Feedback de Operações */}
+      {feedbackToastElement}
 
       {/* Conteúdo Principal */}
       <main className="max-w-7xl mx-auto w-full px-4 py-6 flex-1">
