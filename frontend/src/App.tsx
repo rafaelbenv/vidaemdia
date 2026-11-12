@@ -17,12 +17,31 @@ import {
   Activity,
   Database,
   LogOut,
-  Users,
   FileText,
   Smartphone,
   ChevronDown,
 } from 'lucide-react';
-import { apiRequest, createTelegramLink, getTelegramStatus, unlinkTelegram } from './api';
+import {
+  cancelAppointment,
+  createAppointment,
+  createTelegramLink,
+  getAppointments,
+  getAuditLogs,
+  getCalendars,
+  getHealth,
+  getMe,
+  getNotificationsStatus,
+  getProfessionals,
+  getTelegramStatus,
+  grantPermission,
+  login,
+  runWorkerNow,
+  setUnauthorizedHandler,
+  simulateFailure,
+  sendBotMessage,
+  unlinkTelegram,
+  verifyCalendarAccess,
+} from './api';
 import {
   Appointment,
   AuditLogEntry,
@@ -32,205 +51,17 @@ import {
   ProfessionalDirectoryEntry,
   Reminder,
   User,
-  UserRole,
 } from './types';
-
-function sanitizeTelegramHtml(rawHtml: string): string {
-  if (!rawHtml) return '';
-  return rawHtml.replace(/<[^>]*>/g, (tag) => {
-    const lower = tag.toLowerCase();
-    if (
-      lower === '<b>' ||
-      lower === '</b>' ||
-      lower === '<i>' ||
-      lower === '</i>' ||
-      lower === '<code>' ||
-      lower === '</code>'
-    ) {
-      return lower;
-    }
-    return '';
-  });
-}
-
-export function TechTag({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="font-mono text-[11px] text-stone-500 bg-stone-100 rounded px-1.5 py-0.5">
-      {children}
-    </span>
-  );
-}
-
-function getErrorMessageByStatus(status?: number | string): string {
-  const code = Number(status);
-  if (code === 400) return 'Confira os campos do compromisso.';
-  if (code === 401) return 'Sua sessão expirou. Entre de novo.';
-  if (code === 403) return 'Você não tem acesso a esta agenda. Peça ao profissional responsável.';
-  return 'O servidor não respondeu. Tente de novo em instantes.';
-}
-
-const todayStr = (() => {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-})();
-
-function checkIsPast(dateStr: string, timeStr: string): boolean {
-  if (!dateStr || !timeStr) return false;
-  const [year, month, day] = dateStr.split('-').map(Number);
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  if (!year || !month || !day || hours === undefined || minutes === undefined) return false;
-  const targetDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
-  return targetDate.getTime() < Date.now();
-}
-
-function formatApptDateTime(isoString: string): { date: string; time: string } {
-  const d = new Date(isoString);
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-  return { date: `${day}/${month}`, time: `${hours}:${minutes}` };
-}
-
-export interface ConfirmDialogProps {
-  isOpen: boolean;
-  title: string;
-  message: React.ReactNode;
-  confirmLabel?: string;
-  confirmLoadingLabel?: string;
-  cancelLabel?: string;
-  confirmVariant?: 'danger' | 'primary';
-  isLoading?: boolean;
-  onConfirm: () => void | Promise<void>;
-  onCancel: () => void;
-}
-
-export function ConfirmDialog({
-  isOpen,
-  title,
-  message,
-  confirmLabel = 'Confirmar',
-  confirmLoadingLabel,
-  cancelLabel = 'Cancelar',
-  confirmVariant = 'danger',
-  isLoading = false,
-  onConfirm,
-  onCancel,
-}: ConfirmDialogProps) {
-  const safeButtonRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const timer = setTimeout(() => {
-      safeButtonRef.current?.focus();
-    }, 50);
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isLoading) {
-        onCancel();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, isLoading, onCancel]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={() => {
-        if (!isLoading) onCancel();
-      }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
-        className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 border border-stone-200 text-stone-900"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 id="confirm-dialog-title" className="text-base font-bold text-stone-900 mb-2">
-          {title}
-        </h3>
-        <div className="text-sm text-stone-600 mb-6 leading-relaxed">
-          {message}
-        </div>
-        <div className="flex items-center justify-end gap-3">
-          <button
-            ref={safeButtonRef}
-            type="button"
-            disabled={isLoading}
-            onClick={onCancel}
-            className="px-4 py-2 rounded-md border border-stone-300 hover:bg-stone-100 text-stone-700 text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed transition"
-          >
-            {cancelLabel}
-          </button>
-          <button
-            type="button"
-            disabled={isLoading}
-            onClick={onConfirm}
-            className={`px-4 py-2 rounded-md text-xs font-semibold flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed transition ${
-              confirmVariant === 'danger'
-                ? 'bg-red-600 hover:bg-red-700 text-white'
-                : 'bg-brand-700 hover:bg-brand-800 text-white'
-            }`}
-          >
-            {isLoading ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                {confirmLoadingLabel || 'Processando…'}
-              </>
-            ) : (
-              confirmLabel
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export type TabId = 'agenda' | 'rbac' | 'worker' | 'chatbot' | 'auditoria';
-
-export interface TabDefinition {
-  id: TabId;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
-
-export const TAB_DEFINITIONS: TabDefinition[] = [
-  { id: 'agenda', label: 'Agenda', icon: CalendarIcon },
-  { id: 'rbac', label: 'Acessos', icon: Users },
-  { id: 'worker', label: 'Lembretes', icon: Bell },
-  { id: 'chatbot', label: 'Assistente', icon: MessageSquare },
-  { id: 'auditoria', label: 'Auditoria', icon: FileText },
-];
-
-export function getVisibleTabs(role?: UserRole): TabId[] {
-  if (!role) return ['agenda'];
-  switch (role) {
-    case 'USER':
-      return ['agenda', 'chatbot'];
-    case 'SECRETARY':
-      return ['agenda', 'rbac', 'chatbot'];
-    case 'PROFESSIONAL':
-      // O seed não tem ADMIN, então o profissional vê todas as abas (inclui Auditoria)
-      return ['agenda', 'rbac', 'worker', 'chatbot', 'auditoria'];
-    case 'ADMIN':
-      return ['agenda', 'rbac', 'worker', 'chatbot', 'auditoria'];
-    default:
-      return ['agenda', 'chatbot'];
-  }
-}
+import {
+  checkIsPast,
+  formatApptDateTime,
+  getErrorMessageByStatus,
+  sanitizeTelegramHtml,
+  todayStr,
+} from './lib/format';
+import { getVisibleTabs, TAB_DEFINITIONS, TabId } from './lib/tabs';
+import { ConfirmDialog, ConfirmModalProps } from './components/ConfirmDialog';
+import { TechTag } from './components/TechTag';
 
 export function App() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('vidaemdia_jwt'));
@@ -347,16 +178,7 @@ export function App() {
   };
 
   // Diálogo de Confirmação Acessível
-  const [confirmModal, setConfirmModal] = useState<{
-    title: string;
-    message: React.ReactNode;
-    confirmLabel: string;
-    confirmLoadingLabel?: string;
-    cancelLabel: string;
-    confirmVariant?: 'danger' | 'primary';
-    loadingKey?: string;
-    onConfirm: () => void | Promise<void>;
-  } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<ConfirmModalProps | null>(null);
 
   function openCancelDialog(appt: Appointment) {
     const { date, time } = formatApptDateTime(appt.startTime);
@@ -467,12 +289,12 @@ export function App() {
     try {
       setLoading(true);
       const [me, calData, profs, audits, notifStatus, health] = await Promise.all([
-        apiRequest<User>('/auth/me', {}, jwt),
-        apiRequest<{ owned: Calendar[]; delegated: Calendar[] }>('/agendas', {}, jwt),
-        apiRequest<ProfessionalDirectoryEntry[]>('/agendas/profissionais', {}, jwt),
-        apiRequest<AuditLogEntry[]>('/auditoria', {}, jwt),
-        apiRequest<any>('/notificacoes/status', {}, jwt),
-        apiRequest<any>('/health', {}, jwt),
+        getMe(jwt),
+        getCalendars(jwt),
+        getProfessionals(jwt),
+        getAuditLogs(jwt),
+        getNotificationsStatus(jwt),
+        getHealth(jwt),
       ]);
 
       setUser(me);
@@ -514,7 +336,7 @@ export function App() {
     if (!token) return;
     setLoadingAppointments(true);
     try {
-      const list = await apiRequest<Appointment[]>(`/compromissos?calendarId=${calendarId}`, {}, token);
+      const list = await getAppointments(token, calendarId);
       setAppointments(list);
     } catch (err: any) {
       const status = err.status || 500;
@@ -534,10 +356,7 @@ export function App() {
     const loginEmail = quickEmail || email;
     try {
       setLoading(true);
-      const res = await apiRequest<{ accessToken: string; user: User }>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email: loginEmail, password }),
-      });
+      const res = await login(loginEmail, password);
       localStorage.setItem('vidaemdia_jwt', res.accessToken);
       setSelectedCalendarId('');
       setToken(res.accessToken);
@@ -568,6 +387,11 @@ export function App() {
     setActiveTab('agenda');
     setUserMenuOpen(false);
   }
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => handleLogout());
+    return () => setUnauthorizedHandler(null);
+  }, []);
 
   async function handleConnectTelegram() {
     if (!token || submitting['telegram']) return;
@@ -660,20 +484,16 @@ export function App() {
 
     try {
       const startIso = new Date(`${formDate}T${formTime}:00`).toISOString();
-      await apiRequest<Appointment>(
-        '/compromissos',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            calendarId: selectedCalendarId,
-            title: formTitle,
-            description: formDesc || undefined,
-            startTime: startIso,
-            reminderMinutesBefore: Number(formReminderMinutes),
-            reminderChannel: formChannel,
-          }),
-        },
+      await createAppointment(
         token,
+        {
+          calendarId: selectedCalendarId,
+          title: formTitle,
+          description: formDesc || undefined,
+          startTime: startIso,
+          reminderMinutesBefore: Number(formReminderMinutes),
+          reminderChannel: formChannel,
+        },
       );
 
       setFormTitle('');
@@ -695,7 +515,7 @@ export function App() {
         detail: `${status || 400} — ${err.message}`,
       });
       if (token) {
-        const audits = await apiRequest<AuditLogEntry[]>('/auditoria', {}, token);
+        const audits = await getAuditLogs(token);
         setAuditLogs(audits);
       }
     } finally {
@@ -711,7 +531,7 @@ export function App() {
     setSubmittingKey(key, true);
 
     try {
-      await apiRequest(`/compromissos/${id}`, { method: 'DELETE' }, token);
+      await cancelAppointment(token, id);
       setFeedbackBanner({
         type: 'success',
         title: 'Compromisso cancelado com sucesso.',
@@ -736,7 +556,7 @@ export function App() {
     if (!token) return;
     setFeedbackBanner(null);
     try {
-      await apiRequest(`/agendas/${calendarId}/verificar-acesso`, {}, token);
+      await verifyCalendarAccess(token, calendarId);
       setSelectedCalendarId(calendarId);
       setActiveTab('agenda');
       setFeedbackBanner({
@@ -752,7 +572,7 @@ export function App() {
         detail: `${status} — ${err.message || '403 Acesso negado: Secretária não tem autorização para esta agenda.'}`,
       });
       // Atualiza logs de auditoria para mostrar o bloqueio 403 gravado
-      const audits = await apiRequest<AuditLogEntry[]>('/auditoria', {}, token);
+      const audits = await getAuditLogs(token);
       setAuditLogs(audits);
     }
   }
@@ -764,19 +584,16 @@ export function App() {
     setSubmittingKey('grant', true);
 
     try {
-      await apiRequest(
-        `/agendas/${selectedCalendarId}/permissoes`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            secretaryEmail: secretaryEmailToGrant,
-            canView: true,
-            canCreate: true,
-            canUpdate: true,
-            canCancel: true,
-          }),
-        },
+      await grantPermission(
         token,
+        selectedCalendarId,
+        {
+          secretaryEmail: secretaryEmailToGrant,
+          canView: true,
+          canCreate: true,
+          canUpdate: true,
+          canCancel: true,
+        },
       );
       setFeedbackBanner({
         type: 'success',
@@ -801,7 +618,7 @@ export function App() {
     if (!token || submitting['worker']) return;
     setSubmittingKey('worker', true);
     try {
-      const res = await apiRequest<any>('/notificacoes/executar-worker', { method: 'POST' }, token);
+      const res = await runWorkerNow(token);
       setFeedbackBanner({
         type: 'success',
         title: 'Ciclo de notificações executado com sucesso.',
@@ -822,10 +639,7 @@ export function App() {
   async function handleSimulateFailure() {
     if (!token) return;
     try {
-      await apiRequest('/notificacoes/simular-falha', {
-        method: 'POST',
-        body: JSON.stringify({ failCount: 1 }),
-      }, token);
+      await simulateFailure(token, { failCount: 1 });
       setFeedbackBanner({
         type: 'error',
         title: 'Simulação de falha ativada! O próximo envio ao Telegram falhará.',
@@ -856,16 +670,7 @@ export function App() {
     setSubmittingKey('chat', true);
 
     try {
-      const res = await apiRequest<{ botReply: string }>(
-        '/notificacoes/bot/webhook',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            text: msgText,
-          }),
-        },
-        token,
-      );
+      const res = await sendBotMessage(token, { text: msgText });
 
       setChatHistory((prev) => [
         ...prev,
