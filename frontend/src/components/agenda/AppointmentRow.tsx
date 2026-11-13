@@ -66,7 +66,21 @@ export function AppointmentRow({
         </div>
 
         {isCancelled ? (
-          <div className="text-xs text-stone-500 mt-0.5">Cancelado</div>
+          <div className="text-xs text-stone-500 mt-0.5 flex flex-wrap items-center gap-x-1.5">
+            <span>Cancelado</span>
+            {appt.googleSyncError && (
+              <>
+                <span>·</span>
+                <span
+                  className="text-red-600 inline-flex items-center gap-1"
+                  title={appt.googleSyncError}
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span>Não foi para o Google</span>
+                </span>
+              </>
+            )}
+          </div>
         ) : (
           <div className="text-xs text-stone-500 mt-0.5 flex flex-wrap items-center gap-x-1.5">
             {appt.description && (
@@ -96,9 +110,21 @@ export function AppointmentRow({
                 {reminder.tone === 'muted' && <span>{reminder.text}</span>}
               </span>
             )}
-            {createdByOther && (
+            {appt.googleSyncError && (
               <>
                 {(appt.description || reminder) && <span>·</span>}
+                <span
+                  className="text-red-600 inline-flex items-center gap-1"
+                  title={appt.googleSyncError}
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span>Não foi para o Google</span>
+                </span>
+              </>
+            )}
+            {createdByOther && (
+              <>
+                {(appt.description || reminder || appt.googleSyncError) && <span>·</span>}
                 <span>por {createdByOther}</span>
               </>
             )}

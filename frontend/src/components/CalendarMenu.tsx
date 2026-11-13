@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, ChevronDown, History, Users } from 'lucide-react';
+import { Check, ChevronDown, History, RefreshCw, Users } from 'lucide-react';
 import { Calendar } from '../types';
 import { useDropdown } from '../hooks/useDropdown';
 
@@ -8,9 +8,11 @@ export interface CalendarMenuProps {
   delegated: Calendar[];
   selectedId: string;
   canShareSelected: boolean;
+  googleConfigured?: boolean;
   onSelect: (id: string) => void;
   onShare: () => void;
   onHistory: () => void;
+  onGoogleLink?: () => void;
 }
 
 export function CalendarMenu({
@@ -18,9 +20,11 @@ export function CalendarMenu({
   delegated,
   selectedId,
   canShareSelected,
+  googleConfigured,
   onSelect,
   onShare,
   onHistory,
+  onGoogleLink,
 }: CalendarMenuProps) {
   const { open, setOpen, ref } = useDropdown<HTMLDivElement>();
 
@@ -191,6 +195,24 @@ export function CalendarMenu({
                 <History className="w-4 h-4 text-stone-500 shrink-0" />
                 <span>Histórico desta agenda</span>
               </button>
+              {googleConfigured && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setOpen(false);
+                    onGoogleLink?.();
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-stone-100 flex items-center gap-2 min-h-11 min-w-11 sm:min-h-[40px] sm:min-w-0 text-stone-700"
+                >
+                  <RefreshCw className="w-4 h-4 text-stone-500 shrink-0" />
+                  <span className="truncate">
+                    {activeCalendar?.googleCalendarId
+                      ? `Google Agenda: ${activeCalendar.googleCalendarName || activeCalendar.googleCalendarId}`
+                      : 'Google Agenda…'}
+                  </span>
+                </button>
+              )}
             </>
           )}
         </div>

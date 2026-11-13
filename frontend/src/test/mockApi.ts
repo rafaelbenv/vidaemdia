@@ -349,6 +349,14 @@ export function installMockApi(seed?: MockApiSeed) {
       });
     }
 
+    // GET /google/status
+    if (route === '/google/status' && method === 'GET') {
+      return jsonResponse({
+        configured: false,
+        connected: false,
+      });
+    }
+
     // GET /auditoria
     if (route === '/auditoria' && method === 'GET') {
       return jsonResponse([]);
