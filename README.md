@@ -126,9 +126,33 @@ Para receber os updates via webhook em produção ou com ferramenta de túnel:
 
 ## 4. Como Executar o Projeto
 
+### 4.1. Configuração de Segredos Obrigatórios (.env)
+
+O sistema não possui senhas ou segredos padrão embutidos no código ou no Docker Compose. Antes de iniciar, configure obrigatoriamente no `.env`:
+
+* **`POSTGRES_PASSWORD`**: Senha do banco PostgreSQL (e atualize a `DATABASE_URL` correspondente).
+* **`JWT_SECRET`**: Segredo de assinatura dos tokens JWT (obrigatório ter **no mínimo 32 caracteres**).
+* **`GRAFANA_ADMIN_PASSWORD`**: Senha de acesso do usuário administrador do Grafana.
+
+#### Como gerar segredos seguros
+Gere chaves aleatórias e seguras via terminal:
+```bash
+openssl rand -hex 32
+```
+
+> [!WARNING]
+> **Aviso sobre o volume do PostgreSQL:** A senha `POSTGRES_PASSWORD` definida no `.env` só é aplicada na inicialização inicial do volume Docker (`postgres_data`). Caso altere a senha no `.env` com um volume já existente, o PostgreSQL continuará com a senha antiga, causando falha de autenticação. Para alterar a senha em um banco existente, execute o comando SQL antes de mudar o `.env`:
+> ```sql
+> ALTER USER vidaemdia WITH PASSWORD 'nova_senha';
+> ```
+> (ou recrie o volume se não precisar manter os dados: `docker compose down -v`).
+
+> [!NOTE]
+> **Pipeline de CI/CD:** Os testes unitários, checagens de lint e build do backend no CI não precisam desses segredos configurados, pois os testes não acessam o banco de dados.
+
 ### Opção A: Via Docker Compose (Recomendado — Stack Completa)
 
-1. Copie o arquivo de variáveis de ambiente:
+1. Copie o arquivo de variáveis de ambiente e preencha os segredos obrigatórios:
    ```bash
    cp .env.example .env
    ```
@@ -146,7 +170,7 @@ Para receber os updates via webhook em produção ou com ferramenta de túnel:
    * **Healthcheck:** `http://localhost:3000/health`
    * **Métricas Prometheus:** `http://localhost:3000/metrics`
    * **Prometheus UI:** `http://localhost:9090`
-   * **Grafana Dashboard:** `http://localhost:3001` (usuário: `admin` / senha: `vidaemdia_admin`)
+   * **Grafana Dashboard:** `http://localhost:3001` (usuário: `admin` / senha: a definida em `GRAFANA_ADMIN_PASSWORD` no `.env`)
 
 ### Opção B: Execução em Desenvolvimento Local (Node.js)
 

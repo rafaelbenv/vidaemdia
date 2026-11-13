@@ -1,11 +1,20 @@
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { getJwtSecret, isPublicExampleSecret } from './config/jwt-secret';
 
 async function bootstrap() {
+  getJwtSecret();
+  if (isPublicExampleSecret()) {
+    Logger.warn(
+      'JWT_SECRET igual ao valor de exemplo público. Troque no .env (openssl rand -hex 32); as sessões abertas serão encerradas.',
+      'Segurança',
+    );
+  }
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.set('trust proxy', 1);

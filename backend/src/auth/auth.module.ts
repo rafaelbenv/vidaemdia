@@ -5,13 +5,14 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { MonitoringModule } from '../monitoring/monitoring.module';
+import { getJwtSecret } from '../config/jwt-secret';
 
 @Module({
   imports: [
     PassportModule,
     MonitoringModule,
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'vidaemdia_jwt_super_secret_key_2026',
+      secret: getJwtSecret(),
       signOptions: { expiresIn: (process.env.JWT_EXPIRES_IN || '8h') as any },
     }),
   ],
