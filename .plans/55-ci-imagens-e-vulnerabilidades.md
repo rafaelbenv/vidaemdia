@@ -55,3 +55,11 @@ Não execute comandos de terminal. Use só ferramentas de arquivo.
 
 ## O que NÃO alterar
 - Dockerfiles, código, os jobs existentes.
+
+## Correção após a primeira execução no CI
+O Trivy encontrou 3 CRITICAL com correção na imagem do front (`nginxinc/nginx-unprivileged:1.27-alpine`, Alpine 3.21.3: `brotli-libs`, `libcrypto3`, `libssl3`). Além disso, o Node 20 saiu de suporte em abril de 2026.
+Ajustes (arquivos: `frontend/Dockerfile`, `backend/Dockerfile`, `.github/workflows/ci.yml`, `README.md` se citar a versão do Node):
+1. Nas imagens finais, atualizar os pacotes do sistema na construção:
+   - front (estágio `runner`): logo após o `FROM nginxinc/nginx-unprivileged...`: `USER root`, `RUN apk upgrade --no-cache`, `USER 101` (o usuário sem privilégio da imagem).
+   - backend (estágios `deps` e `runner`): trocar `RUN apk add --no-cache openssl` por `RUN apk upgrade --no-cache && apk add --no-cache openssl`.
+2. Trocar `node:20-alpine` por `node:22-alpine` em todos os `FROM` dos dois Dockerfiles, e `node-version: 20` por `node-version: 22` no `ci.yml`.
