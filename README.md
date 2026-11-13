@@ -149,7 +149,7 @@ openssl rand -hex 32
 > (ou recrie o volume se não precisar manter os dados: `docker compose down -v`).
 
 > [!NOTE]
-> **Pipeline de CI/CD:** Os testes unitários, checagens de lint e build do backend no CI não precisam desses segredos configurados, pois os testes não acessam o banco de dados.
+> **Pipeline de CI/CD:** O CI roda lint, build e testes do backend e do front, constrói as imagens Docker e as examina com o Trivy (falha com vulnerabilidade crítica que já tem correção). Os testes unitários, checagens de lint e build do backend no CI não precisam desses segredos configurados, pois os testes não acessam o banco de dados.
 
 ### Opção A: Via Docker Compose (Recomendado — Stack Completa)
 
