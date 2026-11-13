@@ -28,7 +28,7 @@ Não execute comandos de terminal. Use só ferramentas de arquivo.
          cache-from: type=gha,scope=${{ matrix.service }}
          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
      - name: Relatório de vulnerabilidades (HIGH e CRITICAL)
-       uses: aquasecurity/trivy-action@0.28.0
+       uses: aquasecurity/trivy-action@v0.35.0
        with:
          image-ref: vidaemdia-${{ matrix.service }}:ci
          scanners: vuln
@@ -37,7 +37,7 @@ Não execute comandos de terminal. Use só ferramentas de arquivo.
          format: table
          exit-code: '0'
      - name: Bloquear CRITICAL com correção disponível
-       uses: aquasecurity/trivy-action@0.28.0
+       uses: aquasecurity/trivy-action@v0.35.0
        with:
          image-ref: vidaemdia-${{ matrix.service }}:ci
          scanners: vuln
