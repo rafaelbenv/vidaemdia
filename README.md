@@ -205,6 +205,9 @@ openssl rand -hex 32
    ```bash
    docker exec vidaemdia-backend npm run prisma:seed:prod
    ```
+   > [!WARNING]
+   > O seed **apaga e recria** as agendas das contas de demonstração (Carlos, Dr. João, Dra. Ana e Maria), junto com os compromissos, lembretes e acessos delas.
+   > Rode só na primeira subida ou quando quiser voltar essas contas ao estado inicial. Outras contas não são afetadas.
 4. Acesse os serviços:
    * **Aplicação Web (Frontend):** `http://localhost:8080`
    * **Grafana Dashboard:** `http://localhost:8080/grafana/` (usuário: `admin` / senha: a definida em `GRAFANA_ADMIN_PASSWORD` no `.env`). O dashboard **VidaEmDia — Visão geral** está provisionado na pasta **VidaEmDia**.

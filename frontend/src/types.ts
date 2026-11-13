@@ -45,6 +45,9 @@ export interface Calendar {
   name: string;
   description?: string;
   color: string;
+  googleCalendarId?: string | null;
+  googleCalendarName?: string | null;
+  googleLinkedAt?: string | null;
   owner?: User;
   permissions?: CalendarPermission[];
   myPermissions?: CalendarPermission;

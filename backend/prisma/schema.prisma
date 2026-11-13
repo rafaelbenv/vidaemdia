@@ -68,6 +68,10 @@ model Calendar {
   createdAt   DateTime     @default(now()) @map("created_at")
   updatedAt   DateTime     @updatedAt @map("updated_at")
 
+  googleCalendarId   String?   @map("google_calendar_id")
+  googleCalendarName String?   @map("google_calendar_name")
+  googleLinkedAt     DateTime? @map("google_linked_at")
+
   owner        User                 @relation("CalendarOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   permissions  CalendarPermission[]
   appointments Appointment[]
