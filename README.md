@@ -133,6 +133,7 @@ O sistema não possui senhas ou segredos padrão embutidos no código ou no Dock
 * **`POSTGRES_PASSWORD`**: Senha do banco PostgreSQL (e atualize a `DATABASE_URL` correspondente).
 * **`JWT_SECRET`**: Segredo de assinatura dos tokens JWT (obrigatório ter **no mínimo 32 caracteres**).
 * **`GRAFANA_ADMIN_PASSWORD`**: Senha de acesso do usuário administrador do Grafana.
+* **`CORS_ORIGIN`**: Opcional. Só preencha se o front rodar em outro endereço que não passe pelo `/api` (ex.: `http://localhost:5173`). Vários: separados por vírgula. Padrão vazio (CORS desligado; acesso restrito à mesma origem via reverse proxy).
 
 #### Como gerar segredos seguros
 Gere chaves aleatórias e seguras via terminal:

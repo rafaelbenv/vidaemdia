@@ -4,6 +4,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { parseCorsOrigins } from './config/cors';
 import { getJwtSecret, isPublicExampleSecret } from './config/jwt-secret';
 
 async function bootstrap() {
@@ -20,10 +21,16 @@ async function bootstrap() {
   app.set('trust proxy', 1);
   app.use(helmet({ contentSecurityPolicy: false }));
 
-  app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*',
-    credentials: true,
-  });
+  const origins = parseCorsOrigins(process.env.CORS_ORIGIN);
+  if (origins.length === 0) {
+    Logger.log('CORS desligado: só o próprio endereço chama a API.', 'Segurança');
+  } else {
+    app.enableCors({
+      origin: origins,
+      credentials: true,
+    });
+    Logger.log(`CORS habilitado para: ${origins.join(', ')}`, 'Segurança');
+  }
 
   app.useGlobalPipes(
     new ValidationPipe({
