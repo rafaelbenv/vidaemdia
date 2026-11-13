@@ -59,7 +59,7 @@ Trabalho Devops/
 │   │   └── types.ts                # Contratos TypeScript
 │   └── Dockerfile
 ├── infra/                          # DevOps: Reverse Proxy, Monitoramento e Backup/Restore
-│   ├── nginx/nginx.conf            # Reverse Proxy + Headers de Segurança (HSTS, X-Frame-Options)
+│   ├── nginx/nginx.conf            # Reverse Proxy (App, API, Grafana) + Headers de Segurança (X-Frame-Options, etc.)
 │   ├── monitoring/                 # Configuração do Prometheus e Datasource do Grafana
 │   └── backup/                     # Scripts backup.sh / restore.sh e backup.ps1 / restore.ps1
 ├── docker-compose.yml              # Orquestração completa dos serviços
@@ -112,7 +112,7 @@ Para receber os updates via webhook em produção ou com ferramenta de túnel:
    TELEGRAM_WEBHOOK_SECRET=sua_chave_secreta_longa
    ```
 3. O backend executa o registro automático (`setWebhook`) ao inicializar, repassando o secret token para validação contra ataques de falsificação.
-4. **Nota sobre Nginx:** O proxy reverso do projeto já repassa todas as rotas `/api/*` diretamente ao backend (`http://backend:3000/`). Assim, o webhook pode ser exposto publicamente como `https://seu-dominio.com/api/telegram/webhook` (via Nginx na porta 8080/8443) ou direto na porta da API NestJS `https://seu-dominio.com/telegram/webhook` (porta 3000).
+4. **Nota sobre Nginx:** O proxy reverso do projeto repassa todas as rotas `/api/*` diretamente ao backend (`http://backend:3000/`) e `/grafana/*` ao Grafana. O webhook do Telegram pode ser exposto publicamente como `https://seu-dominio.com/api/telegram/webhook` (via Nginx na porta 8080) ou através de ferramenta de túnel na máquina local (porta 3000).
 
 ### 3.5. Como Vincular a Conta do Telegram
 1. O usuário realiza login no sistema web **VidaEmDia**.
@@ -166,12 +166,13 @@ openssl rand -hex 32
    docker exec -it vidaemdia-backend npx prisma db seed
    ```
 4. Acesse os serviços:
-   * **Sistema Web (Frontend):** `http://localhost:8080`
-   * **API Backend & Swagger Docs:** `http://localhost:3000/api/docs`
-   * **Healthcheck:** `http://localhost:3000/health`
-   * **Métricas Prometheus:** `http://localhost:3000/metrics`
-   * **Prometheus UI:** `http://localhost:9090`
-   * **Grafana Dashboard:** `http://localhost:3001` (usuário: `admin` / senha: a definida em `GRAFANA_ADMIN_PASSWORD` no `.env`)
+   * **Aplicação Web (Frontend):** `http://localhost:8080`
+   * **Grafana Dashboard:** `http://localhost:8080/grafana/` (usuário: `admin` / senha: a definida em `GRAFANA_ADMIN_PASSWORD` no `.env`)
+   * **API Backend & Swagger Docs:** `http://localhost:3000/api/docs` (acessível só nesta máquina)
+   * **Healthcheck:** `http://localhost:3000/health` (acessível só nesta máquina)
+   * **Métricas Prometheus:** `http://localhost:3000/metrics` (acessível só nesta máquina)
+   * **PostgreSQL:** `localhost:5432` (acessível só nesta máquina)
+   * **Prometheus:** Somente na rede interna dos containers (o Grafana lê os dados dele diretamente)
 
 ### Opção B: Execução em Desenvolvimento Local (Node.js)
 

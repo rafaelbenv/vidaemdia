@@ -11,7 +11,15 @@ export interface SaudePageProps {
 export function SaudePage({ healthData, auditLogsCount = 0 }: SaudePageProps) {
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <a
+          href="/grafana/"
+          target="_blank"
+          rel="noreferrer"
+          className="px-3 py-1.5 rounded-md bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-mono"
+        >
+          Abrir Grafana ↗
+        </a>
         <a
           href={`${API_BASE_URL}/metrics`}
           target="_blank"
