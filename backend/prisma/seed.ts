@@ -5,6 +5,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Iniciando seed do banco de dados VidaEmDia...');
+  console.log('⚠️  As agendas, compromissos e acessos das contas de demonstração serão apagados e recriados.');
 
   const passwordHash = await bcrypt.hash('123456', 10);
 

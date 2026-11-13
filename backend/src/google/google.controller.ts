@@ -1,31 +1,47 @@
 import {
+  Body,
   Controller,
-  Get,
   Delete,
+  Get,
+  Logger,
+  Param,
+  Put,
   Query,
   Req,
   Res,
-  UseGuards,
-  Logger,
   ServiceUnavailableException,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiProperty,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { Response } from 'express';
+import { IsNotEmpty, IsString } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GoogleAccountService } from './google-account.service';
+import { GoogleCalendarLinkService } from './google-calendar-link.service';
 import { googleConfig } from './google.config';
+
+export class LinkGoogleCalendarDto {
+  @ApiProperty({ description: 'ID da agenda no Google Calendar' })
+  @IsString()
+  @IsNotEmpty()
+  googleCalendarId: string;
+}
 
 @ApiTags('Google Agenda')
 @Controller('google')
 export class GoogleController {
   private readonly logger = new Logger(GoogleController.name);
 
-  constructor(private readonly googleAccountService: GoogleAccountService) {}
+  constructor(
+    private readonly googleAccountService: GoogleAccountService,
+    private readonly googleCalendarLinkService: GoogleCalendarLinkService,
+  ) {}
 
   @Get('status')
   @UseGuards(JwtAuthGuard)
@@ -120,5 +136,84 @@ export class GoogleController {
     const userId = req.user?.id || req.user?.sub;
     await this.googleAccountService.disconnect(userId);
     return { disconnected: true };
+  }
+
+  @Get('calendars')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Lista as agendas do Google com permissão de escrita',
+  })
+  @ApiResponse({ status: 200, description: 'Agendas listadas com sucesso' })
+  @ApiResponse({
+    status: 503,
+    description: 'Integração com o Google Agenda não configurada',
+  })
+  async listCalendars(@Req() req: any) {
+    const cfg = googleConfig();
+    if (!cfg.configured) {
+      throw new ServiceUnavailableException(
+        'Integração com o Google Agenda não configurada',
+      );
+    }
+    const userId = req.user?.id || req.user?.sub;
+    return this.googleCalendarLinkService.listCalendars(userId);
+  }
+}
+
+@ApiTags('Agendas & Integração Google')
+@Controller('agendas')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
+export class GoogleAgendaLinkController {
+  constructor(
+    private readonly linkService: GoogleCalendarLinkService,
+  ) {}
+
+  @Put(':id/google')
+  @ApiOperation({
+    summary: 'Liga uma agenda do VidaEmDia a uma agenda do Google',
+  })
+  @ApiResponse({ status: 200, description: 'Agenda ligada com sucesso' })
+  @ApiResponse({
+    status: 503,
+    description: 'Integração com o Google Agenda não configurada',
+  })
+  async link(
+    @Param('id') calendarId: string,
+    @Body() dto: LinkGoogleCalendarDto,
+    @Req() req: any,
+  ) {
+    const cfg = googleConfig();
+    if (!cfg.configured) {
+      throw new ServiceUnavailableException(
+        'Integração com o Google Agenda não configurada',
+      );
+    }
+    const userId = req.user?.id || req.user?.sub;
+    return this.linkService.link(userId, calendarId, dto.googleCalendarId);
+  }
+
+  @Delete(':id/google')
+  @ApiOperation({
+    summary: 'Desliga uma agenda do VidaEmDia da agenda do Google',
+  })
+  @ApiResponse({ status: 200, description: 'Agenda desligada com sucesso' })
+  @ApiResponse({
+    status: 503,
+    description: 'Integração com o Google Agenda não configurada',
+  })
+  async unlink(
+    @Param('id') calendarId: string,
+    @Req() req: any,
+  ) {
+    const cfg = googleConfig();
+    if (!cfg.configured) {
+      throw new ServiceUnavailableException(
+        'Integração com o Google Agenda não configurada',
+      );
+    }
+    const userId = req.user?.id || req.user?.sub;
+    return this.linkService.unlink(userId, calendarId);
   }
 }
