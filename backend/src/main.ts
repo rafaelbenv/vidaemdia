@@ -6,9 +6,11 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { parseCorsOrigins } from './config/cors';
 import { getJwtSecret, isPublicExampleSecret } from './config/jwt-secret';
+import { googleConfig } from './google/google.config';
 
 async function bootstrap() {
   getJwtSecret();
+  googleConfig(); // falha cedo se a integração com o Google estiver configurada com chave inválida
   if (isPublicExampleSecret()) {
     Logger.warn(
       'JWT_SECRET igual ao valor de exemplo público. Troque no .env (openssl rand -hex 32); as sessões abertas serão encerradas.',

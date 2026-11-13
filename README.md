@@ -124,6 +124,43 @@ Para receber os updates via webhook em produção ou com ferramenta de túnel:
 
 ---
 
+## 3.6. Google Agenda (Opcional)
+
+A integração com o **Google Agenda** permite conectar a conta Google do usuário via OAuth 2.0. Sem as variáveis de ambiente configuradas, a integração permanece desligada (`GET /google/status` retorna `{ configured: false }` e as demais rotas do Google retornam 503).
+
+### Passo a passo para obter as credenciais:
+1. Acesse o [Google Cloud Console](https://console.cloud.google.com/) e crie ou selecione um projeto.
+2. Em **APIs e Serviços > Biblioteca**, procure por **Google Calendar API** e clique em **Ativar**.
+3. Configure a **Tela de consentimento OAuth**:
+   - Tipo de usuário: **Externo**.
+   - Preencha as informações básicas do aplicativo (nome, e-mail de suporte).
+   - Mantenha o status de publicação em **Modo de teste (Testing)**.
+   - Adicione as contas de e-mail utilizadas na demonstração como **Usuários de teste** (Test users).
+4. Em **APIs e Serviços > Credenciais**, clique em **Criar credenciais > ID do cliente OAuth**:
+   - Tipo de aplicativo: **Aplicativo da Web**.
+   - **Origens JavaScript autorizadas:**
+     - `http://localhost:8080`
+     - `http://localhost:3000`
+   - **URIs de redirecionamento autorizados:**
+     - `http://localhost:8080/api/google/callback` (produção/proxy)
+     - `http://localhost:3000/google/callback` (desenvolvimento local)
+5. Obtenha o **ID do cliente** e a **Chave secreta do cliente**.
+
+### Variáveis no `.env`:
+```env
+GOOGLE_CLIENT_ID="seu_client_id.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET="sua_client_secret"
+GOOGLE_REDIRECT_URI="http://localhost:8080/api/google/callback"
+GOOGLE_TOKEN_ENC_KEY="gere_com_openssl_rand_-hex_32"
+FRONTEND_URL="http://localhost:8080"
+```
+
+> **Chave de Criptografia:** Gere a chave de 32 bytes (64 caracteres hexadecimais) com `openssl rand -hex 32`. Caso `GOOGLE_CLIENT_ID` esteja preenchido e a chave não possua 64 caracteres hexadecimais, o backend falha na inicialização por segurança.
+
+> ⚠️ **Aviso de expiração (Modo de teste):** Enquanto o aplicativo estiver em modo de teste no Google Cloud Console, o refresh token do Google expira automaticamente a cada **7 dias**, sendo necessário reconectar a conta.
+
+---
+
 ## 4. Como Executar o Projeto
 
 ### 4.1. Configuração de Segredos Obrigatórios (.env)

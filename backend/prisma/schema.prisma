@@ -53,6 +53,7 @@ model User {
   createdAppointments Appointment[]        @relation("AppointmentCreator")
   auditLogs           AuditLog[]           @relation("AuditActor")
   telegramLinkTokens  TelegramLinkToken[]
+  googleAccount       GoogleAccount?
 
   @@map("users")
 }
@@ -168,6 +169,23 @@ model TelegramLinkToken {
 
   @@index([userId])
   @@map("telegram_link_tokens")
+}
+
+model GoogleAccount {
+  id                   String    @id @default(uuid())
+  userId               String    @unique @map("user_id")
+  googleEmail          String    @map("google_email")
+  refreshTokenEnc      String    @map("refresh_token_enc")
+  accessToken          String?   @map("access_token")
+  accessTokenExpiresAt DateTime? @map("access_token_expires_at")
+  scope                String
+  connectedAt          DateTime  @default(now()) @map("connected_at")
+  lastError            String?   @map("last_error")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("google_accounts")
 }
 
 

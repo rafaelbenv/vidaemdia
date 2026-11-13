@@ -10,6 +10,7 @@ import { CalendarsModule } from './calendars/calendars.module';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { TelegramModule } from './telegram/telegram.module';
+import { GoogleModule } from './google/google.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { TelegramModule } from './telegram/telegram.module';
     AppointmentsModule,
     NotificationsModule,
     TelegramModule,
+    GoogleModule,
   ],
 })
 export class AppModule {}
