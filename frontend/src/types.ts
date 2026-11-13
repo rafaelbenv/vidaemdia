@@ -93,6 +93,9 @@ export interface Appointment {
     owner?: { id: string; name: string; telegramChatId?: string | null };
   };
   reminders: Reminder[];
+  googleEventId?: string | null;
+  googleSyncError?: string | null;
+  googleSyncedAt?: string | null;
 }
 
 export interface ProfessionalDirectoryEntry {

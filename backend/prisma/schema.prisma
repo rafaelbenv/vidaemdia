@@ -112,9 +112,14 @@ model Appointment {
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
 
-  calendar  Calendar   @relation(fields: [calendarId], references: [id], onDelete: Cascade)
-  createdBy User       @relation("AppointmentCreator", fields: [createdById], references: [id])
-  reminders Reminder[]
+  googleEventId   String?           @map("google_event_id")
+  googleSyncError String?           @map("google_sync_error")
+  googleSyncedAt  DateTime?         @map("google_synced_at")
+
+  calendar       Calendar        @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  createdBy      User            @relation("AppointmentCreator", fields: [createdById], references: [id])
+  reminders      Reminder[]
+  googleSyncJobs GoogleSyncJob[]
 
   @@index([calendarId, startTime, endTime])
   @@map("appointments")
@@ -191,5 +196,37 @@ model GoogleAccount {
 
   @@map("google_accounts")
 }
+
+enum GoogleSyncOperation {
+  UPSERT
+  DELETE
+}
+
+enum GoogleSyncStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+}
+
+model GoogleSyncJob {
+  id            String              @id @default(uuid())
+  appointmentId String              @map("appointment_id")
+  operation     GoogleSyncOperation
+  status        GoogleSyncStatus    @default(PENDING)
+  retryCount    Int                 @default(0) @map("retry_count")
+  nextRetryAt   DateTime?           @map("next_retry_at")
+  lastError     String?             @map("last_error")
+  claimedAt     DateTime?           @map("claimed_at")
+  claimedBy     String?             @map("claimed_by")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextRetryAt])
+  @@map("google_sync_jobs")
+}
+
 
 
