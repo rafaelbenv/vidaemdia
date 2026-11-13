@@ -11,6 +11,8 @@ export class MetricsService {
     authFailures: 0,
     telegramUpdatesReceived: 0,
     telegramApiErrors: 0,
+    googleSyncOk: 0,
+    googleSyncErro: 0,
   };
 
   incrementAppointmentCreated(source: 'WEB' | 'TELEGRAM') {
@@ -40,6 +42,14 @@ export class MetricsService {
 
   incrementTelegramApiError() {
     this.counters.telegramApiErrors++;
+  }
+
+  incrementGoogleSync(result: 'ok' | 'erro') {
+    if (result === 'ok') {
+      this.counters.googleSyncOk++;
+    } else {
+      this.counters.googleSyncErro++;
+    }
   }
 
   getSummary() {
@@ -76,6 +86,11 @@ export class MetricsService {
       '# HELP vidaemdia_auth_failures_total Total de falhas de autenticação JWT/Login',
       '# TYPE vidaemdia_auth_failures_total counter',
       `vidaemdia_auth_failures_total ${this.counters.authFailures}`,
+      '',
+      '# HELP vidaemdia_google_sync_total Total de sincronizações de eventos com o Google Agenda',
+      '# TYPE vidaemdia_google_sync_total counter',
+      `vidaemdia_google_sync_total{result="ok"} ${this.counters.googleSyncOk}`,
+      `vidaemdia_google_sync_total{result="erro"} ${this.counters.googleSyncErro}`,
       '',
       '# HELP vidaemdia_uptime_seconds Tempo de atividade do servidor backend em segundos',
       '# TYPE vidaemdia_uptime_seconds gauge',

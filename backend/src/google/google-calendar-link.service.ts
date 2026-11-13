@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,6 +14,7 @@ import {
   GoogleCalendarItem,
 } from './google-calendar.client';
 import { googleConfig } from './google.config';
+import { GoogleSyncQueueService } from './google-sync-queue.service';
 
 @Injectable()
 export class GoogleCalendarLinkService {
@@ -24,6 +26,7 @@ export class GoogleCalendarLinkService {
     private readonly auditService: AuditService,
     private readonly googleAccountService: GoogleAccountService,
     private readonly calendarClient: GoogleCalendarClient,
+    @Optional() private readonly syncQueue?: GoogleSyncQueueService,
   ) {}
 
   async listCalendars(userId: string): Promise<GoogleCalendarItem[]> {
@@ -146,12 +149,18 @@ export class GoogleCalendarLinkService {
   }
 
   protected async afterLink(calendarId: string): Promise<void> {
+    if (this.syncQueue) {
+      await this.syncQueue.enqueueCalendar(calendarId);
+    }
     if (typeof this.onLinked === 'function') {
       await this.onLinked(calendarId);
     }
   }
 
   protected async afterUnlink(calendarId: string): Promise<void> {
+    if (this.syncQueue) {
+      await this.syncQueue.dropCalendar(calendarId);
+    }
     if (typeof this.onUnlinked === 'function') {
       await this.onUnlinked(calendarId);
     }

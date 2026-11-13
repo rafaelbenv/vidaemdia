@@ -1,10 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { AppointmentStatus, CalendarType, NotificationChannel, ReminderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CalendarAccessService } from '../calendars/calendar-access.service';
 import { MetricsService } from '../monitoring/metrics.service';
 import { CreateAppointmentDto, UpdateAppointmentDto } from './dto/appointment.dto';
+import { GoogleSyncQueueService } from '../google/google-sync-queue.service';
 
 @Injectable()
 export class AppointmentsService {
@@ -13,6 +14,7 @@ export class AppointmentsService {
     private readonly auditService: AuditService,
     private readonly calendarAccess: CalendarAccessService,
     private readonly metricsService: MetricsService,
+    @Optional() private readonly googleSyncQueue?: GoogleSyncQueueService,
   ) {}
 
   async findAllForCalendar(userId: string, userRole: string, calendarId: string, ipAddress?: string) {
@@ -151,6 +153,12 @@ export class AppointmentsService {
       },
       ipAddress,
     });
+
+    if (calendar.googleCalendarId && this.googleSyncQueue) {
+      const syncOp =
+        appointment.status === AppointmentStatus.CANCELLED ? 'DELETE' : 'UPSERT';
+      await this.googleSyncQueue.enqueue(appointment.id, syncOp);
+    }
 
     return appointment;
   }
@@ -327,6 +335,12 @@ export class AppointmentsService {
       },
       ipAddress,
     });
+
+    if (calendar.googleCalendarId && this.googleSyncQueue && updated) {
+      const syncOp =
+        updated.status === AppointmentStatus.CANCELLED ? 'DELETE' : 'UPSERT';
+      await this.googleSyncQueue.enqueue(updated.id, syncOp);
+    }
 
     return updated;
   }

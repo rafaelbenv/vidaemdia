@@ -3,9 +3,10 @@ import { AppointmentsService } from './appointments.service';
 import { AppointmentsController } from './appointments.controller';
 import { CalendarsModule } from '../calendars/calendars.module';
 import { MonitoringModule } from '../monitoring/monitoring.module';
+import { GoogleModule } from '../google/google.module';
 
 @Module({
-  imports: [CalendarsModule, MonitoringModule],
+  imports: [CalendarsModule, MonitoringModule, GoogleModule],
   controllers: [AppointmentsController],
   providers: [AppointmentsService],
   exports: [AppointmentsService],
