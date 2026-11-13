@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { AppointmentStatus, CalendarType, NotificationChannel, ReminderStatus } from '@prisma/client';
 import { AppointmentsService } from './appointments.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -141,6 +141,214 @@ describe('AppointmentsService', () => {
       expect(mockPrisma.appointment.create).toHaveBeenCalledTimes(1);
       const callArgs = mockPrisma.appointment.create.mock.calls[0][0];
       expect(callArgs.data).not.toHaveProperty('reminders');
+    });
+
+    it('agenda PROFESSIONAL com compromisso sobreposto deve lançar BadRequestException ("Conflito de horário") e não chamar prisma.appointment.create', async () => {
+      mockCalendarAccess.verifyAccessOrThrow.mockResolvedValue({
+        calendar: { ...baseCalendar, type: CalendarType.PROFESSIONAL },
+        isDelegated: false,
+      });
+
+      mockPrisma.appointment.findFirst.mockResolvedValue({
+        id: 'app-conflict',
+        title: 'Compromisso Conflitante',
+      });
+
+      const startTimeStr = '2026-11-20T10:00:00.000Z';
+      const endTimeStr = '2026-11-20T11:00:00.000Z';
+      const dto: CreateAppointmentDto = {
+        calendarId: 'cal-1',
+        title: 'Nova Consulta',
+        startTime: startTimeStr,
+        endTime: endTimeStr,
+      };
+
+      await expect(service.create('user-1', 'USER', dto)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.create('user-1', 'USER', dto)).rejects.toThrow(
+        'Conflito de horário',
+      );
+
+      expect(mockPrisma.appointment.create).not.toHaveBeenCalled();
+      expect(mockPrisma.appointment.findFirst).toHaveBeenCalledWith({
+        where: {
+          calendarId: 'cal-1',
+          status: AppointmentStatus.SCHEDULED,
+          AND: [
+            { startTime: { lt: new Date(endTimeStr) } },
+            { endTime: { gt: new Date(startTimeStr) } },
+          ],
+        },
+      });
+    });
+
+    it('agenda PERSONAL com o mesmo cenário deve criar normalmente sem chamar findFirst', async () => {
+      mockCalendarAccess.verifyAccessOrThrow.mockResolvedValue({
+        calendar: { ...baseCalendar, type: CalendarType.PERSONAL },
+        isDelegated: false,
+      });
+
+      const dto: CreateAppointmentDto = {
+        calendarId: 'cal-1',
+        title: 'Consulta Pessoal',
+        startTime: '2026-11-20T10:00:00.000Z',
+        endTime: '2026-11-20T11:00:00.000Z',
+      };
+
+      await service.create('user-1', 'USER', dto);
+
+      expect(mockPrisma.appointment.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.appointment.create).toHaveBeenCalled();
+    });
+
+    it('em agenda PROFESSIONAL encostando sem sobrepor (findFirst devolve null) deve criar o compromisso', async () => {
+      mockCalendarAccess.verifyAccessOrThrow.mockResolvedValue({
+        calendar: { ...baseCalendar, type: CalendarType.PROFESSIONAL },
+        isDelegated: false,
+      });
+      mockPrisma.appointment.findFirst.mockResolvedValue(null);
+
+      const dto: CreateAppointmentDto = {
+        calendarId: 'cal-1',
+        title: 'Consulta Sequencial',
+        startTime: '2026-11-20T11:00:00.000Z',
+        endTime: '2026-11-20T12:00:00.000Z',
+      };
+
+      await service.create('user-1', 'USER', dto);
+
+      expect(mockPrisma.appointment.findFirst).toHaveBeenCalled();
+      expect(mockPrisma.appointment.create).toHaveBeenCalled();
+    });
+
+    it('startTime inválido ("não é data") deve lançar BadRequestException e não criar compromisso', async () => {
+      const dto: CreateAppointmentDto = {
+        calendarId: 'cal-1',
+        title: 'Consulta Data Inválida',
+        startTime: 'não é data',
+      };
+
+      await expect(service.create('user-1', 'USER', dto)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.create('user-1', 'USER', dto)).rejects.toThrow(
+        'Data/horário de início inválido',
+      );
+      expect(mockPrisma.appointment.create).not.toHaveBeenCalled();
+    });
+
+    it('endTime igual ou anterior ao startTime deve lançar BadRequestException e não criar compromisso', async () => {
+      const dtoEqual: CreateAppointmentDto = {
+        calendarId: 'cal-1',
+        title: 'Consulta Término Igual',
+        startTime: '2026-11-20T10:00:00.000Z',
+        endTime: '2026-11-20T10:00:00.000Z',
+      };
+
+      await expect(service.create('user-1', 'USER', dtoEqual)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.create('user-1', 'USER', dtoEqual)).rejects.toThrow(
+        'O horário de término deve ser posterior ao horário de início',
+      );
+
+      const dtoBefore: CreateAppointmentDto = {
+        calendarId: 'cal-1',
+        title: 'Consulta Término Anterior',
+        startTime: '2026-11-20T10:00:00.000Z',
+        endTime: '2026-11-20T09:00:00.000Z',
+      };
+
+      await expect(service.create('user-1', 'USER', dtoBefore)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.create('user-1', 'USER', dtoBefore)).rejects.toThrow(
+        'O horário de término deve ser posterior ao horário de início',
+      );
+
+      expect(mockPrisma.appointment.create).not.toHaveBeenCalled();
+    });
+
+    it('sem endTime deve definir endTime = início + 1 hora', async () => {
+      const startTimeStr = '2026-11-20T10:00:00.000Z';
+      const expectedEndTime = new Date('2026-11-20T11:00:00.000Z');
+      const dto: CreateAppointmentDto = {
+        calendarId: 'cal-1',
+        title: 'Consulta Duração Padrão',
+        startTime: startTimeStr,
+      };
+
+      await service.create('user-1', 'USER', dto);
+
+      expect(mockPrisma.appointment.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            startTime: new Date(startTimeStr),
+            endTime: expectedEndTime,
+          }),
+        }),
+      );
+    });
+
+    it('sem permissão (calendarAccess.verifyAccessOrThrow rejeita com ForbiddenException) a exceção sobe e nada é criado', async () => {
+      mockCalendarAccess.verifyAccessOrThrow.mockRejectedValue(
+        new ForbiddenException('Acesso negado à agenda'),
+      );
+
+      const dto: CreateAppointmentDto = {
+        calendarId: 'cal-1',
+        title: 'Consulta Sem Acesso',
+        startTime: '2026-11-20T10:00:00.000Z',
+      };
+
+      await expect(service.create('user-1', 'USER', dto)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(mockPrisma.appointment.create).not.toHaveBeenCalled();
+    });
+
+    it('sucesso grava auditoria com action CREATE e metadata (title/startTime) e incrementa métrica de compromisso criado com origem padrão WEB', async () => {
+      const dto: CreateAppointmentDto = {
+        calendarId: 'cal-1',
+        title: 'Consulta Nova Auditoria',
+        startTime: '2026-11-20T10:00:00.000Z',
+      };
+
+      await service.create('user-1', 'USER', dto);
+
+      expect(mockAuditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'CREATE',
+          metadata: expect.objectContaining({
+            title: dto.title,
+            startTime: new Date(dto.startTime),
+          }),
+        }),
+      );
+      expect(mockMetricsService.incrementAppointmentCreated).toHaveBeenCalledWith('WEB');
+    });
+
+    it('sucesso incrementa métrica de compromisso criado com origem TELEGRAM quando passado explicitamente', async () => {
+      const dto: CreateAppointmentDto = {
+        calendarId: 'cal-1',
+        title: 'Consulta Origem Telegram',
+        startTime: '2026-11-20T10:00:00.000Z',
+      };
+
+      await service.create('user-1', 'USER', dto, 'TELEGRAM');
+
+      expect(mockAuditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'CREATE',
+          metadata: expect.objectContaining({
+            title: dto.title,
+            startTime: new Date(dto.startTime),
+            createdVia: 'TELEGRAM',
+          }),
+        }),
+      );
+      expect(mockMetricsService.incrementAppointmentCreated).toHaveBeenCalledWith('TELEGRAM');
     });
   });
 

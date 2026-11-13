@@ -266,4 +266,155 @@ describe('NotificationWorker', () => {
 
     await firstRunPromise;
   });
+
+  it('quando nenhum lembrete pendente deve retornar processed: 0 com mensagem de aguardando próximo ciclo e não chamar sendReminderMessage', async () => {
+    mockPrisma.reminder.findMany.mockResolvedValueOnce([]);
+
+    const result = await worker.processPendingReminders();
+
+    expect(result.processed).toBe(0);
+    expect(result.message).toContain('aguardando próximo ciclo');
+    expect(mockNotificationProvider.sendReminderMessage).not.toHaveBeenCalled();
+  });
+
+  it('a busca de pendentes filtra status PENDING, remindAt <= agora, retryCount < maxRetries e compromisso SCHEDULED', async () => {
+    mockPrisma.reminder.findMany.mockResolvedValueOnce([]);
+
+    const beforeCall = new Date();
+    await worker.processPendingReminders();
+    const afterCall = new Date();
+
+    expect(mockPrisma.reminder.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: ReminderStatus.PENDING,
+          retryCount: { lt: 3 },
+          appointment: {
+            status: AppointmentStatus.SCHEDULED,
+          },
+          remindAt: {
+            lte: expect.any(Date),
+          },
+        }),
+      }),
+    );
+
+    const callArgs = mockPrisma.reminder.findMany.mock.calls[0][0];
+    const remindAtLte = callArgs.where.remindAt.lte.getTime();
+    expect(remindAtLte).toBeGreaterThanOrEqual(beforeCall.getTime());
+    expect(remindAtLte).toBeLessThanOrEqual(afterCall.getTime());
+  });
+
+  it('formato da mensagem com APP_TIMEZONE=America/Sao_Paulo e compromisso às 2026-11-10T11:00:00Z deve conter título escapado com &lt;b&gt;, 10/11/2026 e 08:00', async () => {
+    const originalTz = process.env.APP_TIMEZONE;
+    process.env.APP_TIMEZONE = 'America/Sao_Paulo';
+
+    try {
+      const customReminder = {
+        ...baseReminder,
+        appointment: {
+          ...baseReminder.appointment,
+          title: '<b>Consulta Especial</b>',
+          startTime: new Date('2026-11-10T11:00:00Z'),
+          endTime: new Date('2026-11-10T12:00:00Z'),
+        },
+      };
+
+      mockPrisma.reminder.findMany.mockResolvedValueOnce([customReminder]);
+      mockPrisma.reminder.updateMany
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 1 });
+
+      await worker.processPendingReminders();
+
+      expect(mockNotificationProvider.sendReminderMessage).toHaveBeenCalledTimes(1);
+      const callArgs = mockNotificationProvider.sendReminderMessage.mock.calls[0][0];
+      expect(callArgs.messageText).toContain('&lt;b&gt;Consulta Especial&lt;/b&gt;');
+      expect(callArgs.messageText).toContain('10/11/2026');
+      expect(callArgs.messageText).toContain('08:00');
+    } finally {
+      if (originalTz !== undefined) {
+        process.env.APP_TIMEZONE = originalTz;
+      } else {
+        delete process.env.APP_TIMEZONE;
+      }
+    }
+  });
+
+  it('maxRetries deve vir de MAX_REMINDER_RETRIES (com "5", 4ª falha ainda volta para PENDING e 5ª marca FAILED)', async () => {
+    const originalMaxRetries = process.env.MAX_REMINDER_RETRIES;
+    process.env.MAX_REMINDER_RETRIES = '5';
+
+    try {
+      // 4ª falha: retryCount atual = 3 -> newRetryCount = 4 (< 5), volta para PENDING
+      mockPrisma.reminder.findMany.mockResolvedValueOnce([
+        {
+          ...baseReminder,
+          id: 'rem-retry-4',
+          retryCount: 3,
+        },
+      ]);
+      mockPrisma.reminder.updateMany
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 1 });
+      mockNotificationProvider.sendReminderMessage.mockResolvedValueOnce({
+        success: false,
+        error: 'Erro na 4ª tentativa',
+      });
+
+      const result4 = await worker.processPendingReminders();
+
+      expect(mockPrisma.reminder.update).toHaveBeenCalledWith({
+        where: { id: 'rem-retry-4' },
+        data: {
+          retryCount: 4,
+          status: ReminderStatus.PENDING,
+          nextRetryAt: expect.any(Date),
+          lastError: 'Erro na 4ª tentativa',
+          claimedAt: null,
+          claimedBy: null,
+        },
+      });
+      expect(result4.retried).toBe(1);
+      expect(result4.failedPermanently).toBe(0);
+
+      // 5ª falha: retryCount atual = 4 -> newRetryCount = 5 (>= 5), marca FAILED
+      mockPrisma.reminder.findMany.mockResolvedValueOnce([
+        {
+          ...baseReminder,
+          id: 'rem-retry-5',
+          retryCount: 4,
+        },
+      ]);
+      mockPrisma.reminder.updateMany
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 1 });
+      mockNotificationProvider.sendReminderMessage.mockResolvedValueOnce({
+        success: false,
+        error: 'Erro na 5ª tentativa',
+      });
+
+      const result5 = await worker.processPendingReminders();
+
+      expect(mockPrisma.reminder.update).toHaveBeenCalledWith({
+        where: { id: 'rem-retry-5' },
+        data: {
+          retryCount: 5,
+          status: ReminderStatus.FAILED,
+          nextRetryAt: null,
+          lastError: 'Erro na 5ª tentativa',
+          claimedAt: null,
+          claimedBy: null,
+        },
+      });
+      expect(result5.retried).toBe(0);
+      expect(result5.failedPermanently).toBe(1);
+    } finally {
+      if (originalMaxRetries !== undefined) {
+        process.env.MAX_REMINDER_RETRIES = originalMaxRetries;
+      } else {
+        delete process.env.MAX_REMINDER_RETRIES;
+      }
+    }
+  });
 });
