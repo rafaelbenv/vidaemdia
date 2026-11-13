@@ -12,6 +12,7 @@ infra/grafana-data/
 infra/prometheus-data/
 backend/prisma/*.db
 backend/prisma/*.db-journal
+backend/dist-seed/
 
 .claude/settings.local.json
 graphify-out/

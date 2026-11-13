@@ -161,9 +161,12 @@ openssl rand -hex 32
    ```bash
    docker compose up -d --build
    ```
+   > [!NOTE]
+   > Os containers do backend (usuário `node`) e do frontend (usuário `nginx`) executam sem privilégios de root e possuem healthcheck integrado configurado. É possível verificar a saúde dos serviços com `docker compose ps` (os serviços exibirão status "healthy").
+
 3. Popule o banco de dados com as contas de demonstração:
    ```bash
-   docker exec -it vidaemdia-backend npx prisma db seed
+   docker exec vidaemdia-backend npm run prisma:seed:prod
    ```
 4. Acesse os serviços:
    * **Aplicação Web (Frontend):** `http://localhost:8080`
