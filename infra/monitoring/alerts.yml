@@ -1,0 +1,56 @@
+groups:
+  - name: vidaemdia
+    rules:
+      - alert: BackendFora
+        expr: up{job="vidaemdia-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "O backend não responde às coletas do Prometheus"
+          description: "O backend não responde às coletas do Prometheus há mais de 1 minuto."
+
+      - alert: BackendReiniciado
+        expr: vidaemdia_uptime_seconds < 120
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "O backend reiniciou há menos de 2 minutos"
+          description: "O backend reiniciou há menos de 2 minutos (tempo de atividade inferior a 120 segundos)."
+
+      - alert: LembretesFalhando
+        expr: increase(vidaemdia_reminders_failed_total[15m]) > 5
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mais de 5 falhas de envio de lembrete em 15 minutos"
+          description: "Mais de 5 falhas de envio de lembretes nos últimos 15 minutos."
+
+      - alert: ErrosApiTelegram
+        expr: increase(vidaemdia_telegram_api_errors_total[15m]) > 5
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Erros repetidos na API do Telegram"
+          description: "Erros repetidos na API do Telegram (mais de 5 erros nos últimos 15 minutos)."
+
+      - alert: MuitosAcessosNegados
+        expr: increase(vidaemdia_rbac_access_denied_total[10m]) > 10
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Muitas tentativas de acesso a agendas sem permissão"
+          description: "Muitas tentativas de acesso a agendas sem permissão (mais de 10 bloqueios RBAC nos últimos 10 minutos)."
+
+      - alert: PossivelForcaBrutaLogin
+        expr: increase(vidaemdia_auth_failures_total[5m]) > 20
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Muitas falhas de login em 5 minutos"
+          description: "Muitas falhas de login em 5 minutos (mais de 20 falhas consecutivas, indicando possível ataque de força bruta)."

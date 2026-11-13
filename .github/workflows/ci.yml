@@ -86,3 +86,14 @@ jobs:
           format: table
           exit-code: '1'
           skip-setup-trivy: true
+
+  monitoring:
+    name: Monitoramento (Prometheus e Grafana)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validar configuração e regras do Prometheus
+        run: |
+          docker run --rm -v "$PWD/infra/monitoring:/cfg" --entrypoint promtool prom/prometheus:v2.53.0 check rules /cfg/alerts.yml
+      - name: Validar JSON do dashboard
+        run: python3 -c "import json; json.load(open('infra/monitoring/grafana/provisioning/dashboards/vidaemdia.json')); print('dashboard ok')"

@@ -60,7 +60,7 @@ Trabalho Devops/
 │   └── Dockerfile
 ├── infra/                          # DevOps: Reverse Proxy, Monitoramento e Backup/Restore
 │   ├── nginx/nginx.conf            # Reverse Proxy (App, API, Grafana) + Headers de Segurança (X-Frame-Options, etc.)
-│   ├── monitoring/                 # Configuração do Prometheus e Datasource do Grafana
+│   ├── monitoring/                 # Configuração do Prometheus (alertas) e Grafana (datasource e dashboard)
 │   └── backup/                     # Scripts backup.sh / restore.sh e backup.ps1 / restore.ps1
 ├── docker-compose.yml              # Orquestração completa dos serviços
 └── .env.example                    # Variáveis de ambiente documentadas
@@ -170,7 +170,7 @@ openssl rand -hex 32
    ```
 4. Acesse os serviços:
    * **Aplicação Web (Frontend):** `http://localhost:8080`
-   * **Grafana Dashboard:** `http://localhost:8080/grafana/` (usuário: `admin` / senha: a definida em `GRAFANA_ADMIN_PASSWORD` no `.env`)
+   * **Grafana Dashboard:** `http://localhost:8080/grafana/` (usuário: `admin` / senha: a definida em `GRAFANA_ADMIN_PASSWORD` no `.env`). O dashboard **VidaEmDia — Visão geral** está provisionado na pasta **VidaEmDia**.
    * **API Backend & Swagger Docs:** `http://localhost:3000/api/docs` (acessível só nesta máquina)
    * **Healthcheck:** `http://localhost:3000/health` (acessível só nesta máquina)
    * **Métricas Prometheus:** `http://localhost:3000/metrics` (acessível só nesta máquina)
@@ -240,3 +240,18 @@ A estrutura do banco de dados PostgreSQL é versionada através do Prisma em `ba
   ```powershell
   .\infra\backup\restore.ps1 -BackupFile .\infra\backup\backups\vidaemdia_backup_YYYYMMDD_HHMMSS.sql
   ```
+
+---
+
+## 8. Monitoramento e Alertas (Prometheus & Grafana)
+
+A stack de monitoramento é composta pelo **Prometheus** (coleta de métricas e avaliação de alertas) e pelo **Grafana** (visualização):
+- **Dashboard provisionado:** O dashboard **"VidaEmDia — Visão geral"** é provisionado automaticamente na pasta **`VidaEmDia`** no Grafana (`http://localhost:8080/grafana/`).
+- **Painel de alertas:** O painel **"Alertas disparados"** exibe em tempo real os alertas ativos avaliados pelo Prometheus (`ALERTS{alertstate="firing"}`).
+- **Regras de alerta configuradas (`infra/monitoring/alerts.yml`):**
+  - **`BackendFora`** (`critical`): O backend não responde às coletas do Prometheus há mais de 1 minuto.
+  - **`BackendReiniciado`** (`warning`): O backend reiniciou há menos de 2 minutos.
+  - **`LembretesFalhando`** (`warning`): Mais de 5 falhas de envio de lembrete em 15 minutos.
+  - **`ErrosApiTelegram`** (`warning`): Erros repetidos na API do Telegram (mais de 5 erros em 15 minutos).
+  - **`MuitosAcessosNegados`** (`warning`): Muitas tentativas de acesso a agendas sem permissão (mais de 10 tentativas em 10 minutos).
+  - **`PossivelForcaBrutaLogin`** (`critical`): Mais de 20 falhas de login em 5 minutos.
