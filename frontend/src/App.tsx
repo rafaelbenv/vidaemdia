@@ -10,6 +10,8 @@ import {
   getAppointments,
   getAuditLogs,
   getCalendars,
+  getGoogleConnectUrl,
+  getGoogleStatus,
   getHealth,
   getMe,
   getNotificationsStatus,
@@ -22,6 +24,7 @@ import {
   setUnauthorizedHandler,
   simulateFailure,
   sendBotMessage,
+  unlinkGoogle,
   unlinkTelegram,
   updateAppointment,
   verifyCalendarAccess,
@@ -34,6 +37,7 @@ import {
   ChatMessage,
   CreateAppointmentBody,
   DispatchedMessageLog,
+  GoogleStatus,
   HealthData,
   ProfessionalDirectoryEntry,
   Reminder,
@@ -64,6 +68,7 @@ import { Toast } from './components/Toast';
 import { UserMenu } from './components/UserMenu';
 import { CalendarMenu } from './components/CalendarMenu';
 import { CalendarBanner } from './components/CalendarBanner';
+import { GoogleLinkDialog } from './components/GoogleLinkDialog';
 import { SessionLoading } from './components/SessionLoading';
 import { SessionLoadError } from './components/SessionLoadError';
 import { BastidoresLayout } from './components/BastidoresLayout';
@@ -119,6 +124,13 @@ export function App() {
   const [ownedCalendars, setOwnedCalendars] = useState<Calendar[]>([]);
   const [delegatedCalendars, setDelegatedCalendars] = useState<Calendar[]>([]);
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>('');
+
+  // Google Integration State
+  const [googleStatus, setGoogleStatus] = useState<GoogleStatus>({
+    configured: false,
+    connected: false,
+  });
+  const [googleLinkDialogOpen, setGoogleLinkDialogOpen] = useState(false);
 
   const allAccessibleCalendars = [...ownedCalendars, ...delegatedCalendars];
   const activeCalendar = allAccessibleCalendars.find((c) => c.id === selectedCalendarId);
@@ -177,6 +189,36 @@ export function App() {
       navigate(AGENDA_PATH, { replace: true });
     }
   }, [token, user, canShareSelected, loading, allAccessibleCalendars.length, location.pathname, navigate]);
+
+  // Google OAuth redirect (?google=conectado / ?google=erro)
+  useEffect(() => {
+    if (!token || !user || loading) return;
+    const params = new URLSearchParams(location.search);
+    const googleParam = params.get('google');
+    if (!googleParam) return;
+
+    params.delete('google');
+    const remaining = params.toString();
+    const newSearch = remaining ? `?${remaining}` : '';
+    navigate({ pathname: location.pathname, search: newSearch }, { replace: true });
+
+    if (googleParam === 'conectado') {
+      setFeedbackBanner({
+        type: 'success',
+        title: 'Google Agenda conectado.',
+      });
+      if (activeCalendar && activeCalendar.ownerId === user.id && !activeCalendar.googleCalendarId) {
+        setGoogleLinkDialogOpen(true);
+      }
+    } else if (googleParam === 'erro') {
+      setFeedbackBanner({
+        type: 'error',
+        title: 'Não foi possível conectar o Google Agenda.',
+        detail:
+          'Tente de novo. Se continuar, confira se seu e-mail está na lista de usuários de teste do app no Google.',
+      });
+    }
+  }, [token, user, loading, location.pathname, location.search, activeCalendar, navigate]);
 
   // Telegram Integration State
   const {
@@ -339,12 +381,14 @@ export function App() {
     try {
       setInitialLoadError(null);
       setLoading(true);
-      const [me, calData] = await Promise.all([
+      const [me, calData, gStatus] = await Promise.all([
         getMe(jwt),
         getCalendars(jwt),
+        getGoogleStatus(jwt).catch(() => ({ configured: false, connected: false })),
       ]);
 
       setUser(me);
+      setGoogleStatus(gStatus);
       setOwnedCalendars(calData.owned);
       setDelegatedCalendars(calData.delegated);
 
@@ -490,6 +534,8 @@ export function App() {
     setChatHistory(createWelcomeMessage());
     setToken(null);
     setUser(null);
+    setGoogleStatus({ configured: false, connected: false });
+    setGoogleLinkDialogOpen(false);
     setInitialLoadError(null);
     setSelectedCalendarId('');
     setAppointments([]);
@@ -601,6 +647,64 @@ export function App() {
       });
     } finally {
       setSubmittingKey('telegram', false);
+    }
+  }
+
+  async function handleConnectGoogle() {
+    if (!token || submitting['google']) return;
+    setFeedbackBanner(null);
+    setSubmittingKey('google', true);
+    try {
+      const res = await getGoogleConnectUrl(token);
+      if (res.url) {
+        window.location.assign(res.url);
+      }
+    } catch (err: unknown) {
+      setFeedbackBanner({
+        type: 'error',
+        title: 'Não foi possível conectar o Google Agenda.',
+        detail: errorMessage(err),
+      });
+    } finally {
+      setSubmittingKey('google', false);
+    }
+  }
+
+  function openDisconnectGoogleDialog() {
+    setConfirmModal({
+      title: 'Desconectar o Google Agenda?',
+      message: 'Os compromissos deixam de ir para o Google. O que já foi enviado continua lá.',
+      confirmLabel: 'Desconectar',
+      confirmLoadingLabel: 'Desconectando…',
+      cancelLabel: 'Manter',
+      confirmVariant: 'danger',
+      loadingKey: 'google',
+      onConfirm: async () => {
+        await handleDisconnectGoogle();
+        setConfirmModal(null);
+      },
+    });
+  }
+
+  async function handleDisconnectGoogle() {
+    if (!token || submitting['google']) return;
+    setFeedbackBanner(null);
+    setSubmittingKey('google', true);
+    try {
+      await unlinkGoogle(token);
+      await loadSession(token);
+      setFeedbackBanner({
+        type: 'success',
+        title: 'Google Agenda desconectado.',
+      });
+    } catch (err: unknown) {
+      setFeedbackBanner({
+        type: 'error',
+        title: 'Não foi possível desconectar o Google Agenda.',
+        detail: errorMessage(err),
+      });
+    } finally {
+      setSubmittingKey('google', false);
     }
   }
 
@@ -1054,9 +1158,11 @@ export function App() {
                 delegated={delegatedCalendars}
                 selectedId={selectedCalendarId}
                 canShareSelected={canShareSelected}
+                googleConfigured={googleStatus.configured}
                 onSelect={handleSelectCalendar}
                 onShare={() => navigate(COMPARTILHAR_PATH)}
                 onHistory={() => navigate(HISTORICO_PATH)}
+                onGoogleLink={() => setGoogleLinkDialogOpen(true)}
               />
             )}
           </div>
@@ -1076,6 +1182,9 @@ export function App() {
             openLogoutDialog={openLogoutDialog}
             showBastidores={SHOW_BASTIDORES}
             onOpenBastidores={() => navigate(bastidoresPath('lembretes'))}
+            googleStatus={googleStatus}
+            handleConnectGoogle={handleConnectGoogle}
+            openDisconnectGoogleDialog={openDisconnectGoogleDialog}
           />
         </div>
       </header>
@@ -1152,6 +1261,28 @@ export function App() {
       )}
 
       {confirmDialogElement}
+
+      {googleLinkDialogOpen && activeCalendar && (
+        <GoogleLinkDialog
+          calendar={activeCalendar}
+          googleStatus={googleStatus}
+          token={token}
+          onClose={() => setGoogleLinkDialogOpen(false)}
+          onChanged={async (toastMsg?: string) => {
+            if (toastMsg) {
+              setFeedbackBanner({
+                type: 'success',
+                title: toastMsg,
+              });
+            }
+            await loadSession(token);
+            if (selectedCalendarId) {
+              await loadAppointments(selectedCalendarId);
+            }
+          }}
+          onConnect={handleConnectGoogle}
+        />
+      )}
     </div>
   );
 }

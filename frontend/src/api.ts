@@ -4,6 +4,8 @@ import {
   BotMessageBody,
   Calendar,
   CreateAppointmentBody,
+  GoogleCalendarOption,
+  GoogleStatus,
   GrantPermissionBody,
   GrantPermissionResponse,
   HealthData,
@@ -246,3 +248,42 @@ export async function createTelegramLink(token: string): Promise<TelegramLinkRes
 export async function unlinkTelegram(token: string): Promise<TelegramUnlinkResponse> {
   return apiRequest<TelegramUnlinkResponse>('/telegram/link', { method: 'DELETE' }, token);
 }
+
+export async function getGoogleStatus(token: string): Promise<GoogleStatus> {
+  return apiRequest<GoogleStatus>('/google/status', {}, token);
+}
+
+export async function getGoogleConnectUrl(token: string): Promise<{ url: string }> {
+  return apiRequest<{ url: string }>('/google/connect', {}, token);
+}
+
+export async function unlinkGoogle(token: string): Promise<{ ok?: boolean; message?: string }> {
+  return apiRequest<{ ok?: boolean; message?: string }>('/google/link', { method: 'DELETE' }, token);
+}
+
+export async function getGoogleCalendars(token: string): Promise<GoogleCalendarOption[]> {
+  return apiRequest<GoogleCalendarOption[]>('/google/calendars', {}, token);
+}
+
+export async function linkCalendarToGoogle(
+  token: string,
+  calendarId: string,
+  googleCalendarId: string,
+): Promise<Calendar> {
+  return apiRequest<Calendar>(
+    `/agendas/${calendarId}/google`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ googleCalendarId }),
+    },
+    token,
+  );
+}
+
+export async function unlinkCalendarFromGoogle(
+  token: string,
+  calendarId: string,
+): Promise<Calendar> {
+  return apiRequest<Calendar>(`/agendas/${calendarId}/google`, { method: 'DELETE' }, token);
+}
+

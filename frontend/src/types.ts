@@ -287,5 +287,20 @@ export interface BotMessageBody {
   senderIdentifier?: string;
 }
 
+export interface GoogleStatus {
+  configured: boolean;
+  connected: boolean;
+  email?: string | null;
+  lastError?: string | null;
+}
+
+export interface GoogleCalendarOption {
+  id: string;
+  summary: string;
+  primary?: boolean;
+  backgroundColor?: string;
+}
+
+
 
 

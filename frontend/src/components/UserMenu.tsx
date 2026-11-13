@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChevronDown, LogOut, Wrench } from 'lucide-react';
-import { User } from '../types';
+import { GoogleStatus, User } from '../types';
 import { firstName, roleLabel } from '../lib/format';
 
 export interface UserMenuProps {
@@ -17,6 +17,9 @@ export interface UserMenuProps {
   openLogoutDialog: () => void;
   showBastidores: boolean;
   onOpenBastidores: () => void;
+  googleStatus?: GoogleStatus | null;
+  handleConnectGoogle?: () => void | Promise<void>;
+  openDisconnectGoogleDialog?: () => void;
 }
 
 export function UserMenu({
@@ -33,6 +36,9 @@ export function UserMenu({
   openLogoutDialog,
   showBastidores,
   onOpenBastidores,
+  googleStatus,
+  handleConnectGoogle,
+  openDisconnectGoogleDialog,
 }: UserMenuProps) {
   const userFirstName = firstName(user.name);
 
@@ -113,6 +119,62 @@ export function UserMenu({
               </div>
             )}
           </div>
+
+          {/* Seção Google Agenda: Conexão / Desconexão */}
+          {googleStatus?.configured && (
+            <div className="px-4 py-2.5 border-b border-stone-100">
+              {googleStatus.lastError ? (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="text-xs text-red-600 flex-1 break-words">
+                      {googleStatus.lastError}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleConnectGoogle?.();
+                      }}
+                      disabled={submitting['google']}
+                      className="text-brand-700 hover:text-brand-800 hover:underline font-semibold disabled:opacity-60 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center shrink-0"
+                    >
+                      {submitting['google'] ? 'Conectando…' : 'Conectar de novo'}
+                    </button>
+                  </div>
+                </div>
+              ) : googleStatus.connected ? (
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-stone-700 truncate" title={googleStatus.email || undefined}>
+                    Google Agenda: {googleStatus.email}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      openDisconnectGoogleDialog?.();
+                    }}
+                    disabled={submitting['google']}
+                    className="text-red-600 hover:text-red-700 hover:underline font-medium disabled:opacity-60 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center shrink-0"
+                  >
+                    {submitting['google'] ? 'Desconectando…' : 'Desconectar'}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-stone-700">Google Agenda: não conectado</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleConnectGoogle?.();
+                    }}
+                    disabled={submitting['google']}
+                    className="text-brand-700 hover:text-brand-800 hover:underline font-semibold disabled:opacity-60 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center shrink-0"
+                  >
+                    {submitting['google'] ? 'Conectando…' : 'Conectar'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Bastidores (área técnica) */}
           {showBastidores && (
