@@ -271,6 +271,7 @@ describe('GooglePullService', () => {
         description: 'Detalhes do evento',
         startTime: futureStart,
         endTime: futureEnd,
+        allDay: false,
         reminderMinutesBefore: 15,
         status: AppointmentStatus.SCHEDULED,
         createdVia: 'GOOGLE',
@@ -359,6 +360,7 @@ describe('GooglePullService', () => {
         description: 'Nova pauta',
         startTime: start,
         endTime: end,
+        allDay: false,
         googleEventId: 'g-event-existing',
         googleEtag: '"etag-different"',
         googleSyncedAt: expect.any(Date),
@@ -580,24 +582,42 @@ describe('GooglePullService', () => {
     });
   });
 
-  it('dia inteiro → ignorado', async () => {
+  it('evento de dia inteiro é criado com allDay: true', async () => {
+    const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const futureDateNext = new Date(futureDate.getTime() + 24 * 60 * 60 * 1000);
+    const dateStr = futureDate.toISOString().slice(0, 10);
+    const dateNextStr = futureDateNext.toISOString().slice(0, 10);
+
     mockCalendarClient.listEvents.mockResolvedValue({
       items: [
         {
           id: 'g-allday',
           summary: 'Feriado',
-          start: { date: '2026-11-20' },
-          end: { date: '2026-11-21' },
+          start: { date: dateStr },
+          end: { date: dateNextStr },
         },
       ],
       nextSyncToken: 'sync-allday',
     });
+    mockPrisma.appointment.create.mockResolvedValue({
+      id: 'appt-allday-created',
+      title: 'Feriado',
+    });
 
     const res = await service.pullCalendar('cal-1');
 
-    expect(res.ignored).toBe(1);
-    expect(res.created).toBe(0);
-    expect(mockPrisma.appointment.create).not.toHaveBeenCalled();
+    expect(res.created).toBe(1);
+    expect(res.ignored).toBe(0);
+    expect(mockPrisma.appointment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'Feriado',
+          allDay: true,
+          createdVia: 'GOOGLE',
+          googleEventId: 'g-allday',
+        }),
+      }),
+    );
   });
 
   it('token expirado grava googleSyncError', async () => {

@@ -147,9 +147,13 @@ export class NotificationWorker {
         });
 
         // Formato fiel ao diagrama: "Lembrete VidaEmDia\nConsulta médica hoje às 08:00."
+        const line = appt.allDay
+          ? `${escapeHtml(appt.title)} em ${dateFormatted} (dia inteiro).\n`
+          : `${escapeHtml(appt.title)} em ${dateFormatted} às ${timeFormatted}.\n`;
+
         const messageText =
           `🔔 <b>Lembrete VidaEmDia</b>\n` +
-          `${escapeHtml(appt.title)} em ${dateFormatted} às ${timeFormatted}.\n` +
+          line +
           (appt.description ? `📝 <i>${escapeHtml(appt.description)}</i>\n` : '') +
           `📂 Agenda: ${escapeHtml(appt.calendar.name)}`;
 

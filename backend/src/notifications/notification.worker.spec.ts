@@ -341,6 +341,42 @@ describe('NotificationWorker', () => {
     }
   });
 
+  it('mensagem de dia inteiro sem horário quando appt.allDay é true', async () => {
+    const originalTz = process.env.APP_TIMEZONE;
+    process.env.APP_TIMEZONE = 'America/Sao_Paulo';
+
+    try {
+      const allDayReminder = {
+        ...baseReminder,
+        appointment: {
+          ...baseReminder.appointment,
+          title: 'Congresso Anual',
+          allDay: true,
+          startTime: new Date('2026-11-20T03:00:00.000Z'),
+          endTime: new Date('2026-11-21T03:00:00.000Z'),
+        },
+      };
+
+      mockPrisma.reminder.findMany.mockResolvedValueOnce([allDayReminder]);
+      mockPrisma.reminder.updateMany
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 1 });
+
+      await worker.processPendingReminders();
+
+      expect(mockNotificationProvider.sendReminderMessage).toHaveBeenCalledTimes(1);
+      const callArgs = mockNotificationProvider.sendReminderMessage.mock.calls[0][0];
+      expect(callArgs.messageText).toContain('Congresso Anual em 20/11/2026 (dia inteiro).');
+      expect(callArgs.messageText).not.toContain('às ');
+    } finally {
+      if (originalTz !== undefined) {
+        process.env.APP_TIMEZONE = originalTz;
+      } else {
+        delete process.env.APP_TIMEZONE;
+      }
+    }
+  });
+
   it('maxRetries deve vir de MAX_REMINDER_RETRIES (com "5", 4ª falha ainda volta para PENDING e 5ª marca FAILED)', async () => {
     const originalMaxRetries = process.env.MAX_REMINDER_RETRIES;
     process.env.MAX_REMINDER_RETRIES = '5';

@@ -109,6 +109,7 @@ model Appointment {
   description       String?
   startTime         DateTime          @map("start_time")
   endTime           DateTime          @map("end_time")
+  allDay            Boolean           @default(false) @map("all_day")
   reminderMinutesBefore Int           @default(30) @map("reminder_minutes_before")
   status            AppointmentStatus @default(SCHEDULED)
   createdVia        String            @default("WEB") @map("created_via") // WEB, TELEGRAM

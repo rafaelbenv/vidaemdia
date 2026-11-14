@@ -29,6 +29,7 @@ describe('AppointmentsService', () => {
     description: 'Desc',
     startTime: new Date('2026-11-20T10:00:00.000Z'),
     endTime: new Date('2026-11-20T11:00:00.000Z'),
+    allDay: false,
     reminderMinutesBefore: 30,
     status: AppointmentStatus.SCHEDULED,
     createdVia: 'WEB',
@@ -175,6 +176,7 @@ describe('AppointmentsService', () => {
         where: {
           calendarId: 'cal-1',
           status: AppointmentStatus.SCHEDULED,
+          allDay: false,
           AND: [
             { startTime: { lt: new Date(endTimeStr) } },
             { endTime: { gt: new Date(startTimeStr) } },
@@ -350,6 +352,43 @@ describe('AppointmentsService', () => {
       );
       expect(mockMetricsService.incrementAppointmentCreated).toHaveBeenCalledWith('TELEGRAM');
     });
+
+    it('criar com allDay normaliza para 00:00 −03:00 e dia seguinte, lembrete às 08:00, sem checagem de conflito mesmo em agenda PROFISSIONAL', async () => {
+      mockCalendarAccess.verifyAccessOrThrow.mockResolvedValue({
+        calendar: { ...baseCalendar, type: CalendarType.PROFESSIONAL },
+        isDelegated: false,
+      });
+
+      const dto: CreateAppointmentDto = {
+        calendarId: 'cal-1',
+        title: 'Dia Inteiro Congresso',
+        startTime: '2026-11-20T15:00:00.000Z',
+        allDay: true,
+      };
+
+      await service.create('user-1', 'USER', dto);
+
+      expect(mockPrisma.appointment.findFirst).not.toHaveBeenCalled();
+
+      const expectedStart = new Date('2026-11-20T03:00:00.000Z');
+      const expectedEnd = new Date('2026-11-21T03:00:00.000Z');
+      const expectedRemindAt = new Date('2026-11-20T11:00:00.000Z');
+
+      expect(mockPrisma.appointment.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            allDay: true,
+            startTime: expectedStart,
+            endTime: expectedEnd,
+            reminders: {
+              create: expect.objectContaining({
+                remindAt: expectedRemindAt,
+              }),
+            },
+          }),
+        }),
+      );
+    });
   });
 
   describe('update', () => {
@@ -433,6 +472,7 @@ describe('AppointmentsService', () => {
           calendarId: 'cal-1',
           id: { not: 'app-1' },
           status: AppointmentStatus.SCHEDULED,
+          allDay: false,
           AND: [
             { startTime: { lt: new Date('2026-11-20T15:00:00.000Z') } },
             { endTime: { gt: new Date('2026-11-20T14:00:00.000Z') } },

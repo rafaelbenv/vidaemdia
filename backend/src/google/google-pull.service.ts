@@ -19,6 +19,7 @@ import { GoogleCalendarClient } from './google-calendar.client';
 import { GoogleInvalidGrantError } from './google-oauth.client';
 import { googleConfig } from './google.config';
 import { fromGoogleEvent } from './google-event.mapper';
+import { allDayRemindAt } from '../appointments/all-day.util';
 
 export interface PullCounters {
   created: number;
@@ -365,7 +366,7 @@ export class GooglePullService {
       return 'cancelled';
     }
 
-    // 4. fromGoogleEvent(ev) devolve null (dia inteiro) → ignorar.
+    // 4. fromGoogleEvent(ev) devolve null (evento sem data válida) → ignorar.
     const mapped = fromGoogleEvent(ev);
     if (!mapped) {
       return 'ignored';
@@ -376,11 +377,10 @@ export class GooglePullService {
       return 'ignored';
     }
 
-    // 6. Existe appt (etag diferente) → update com title, description, startTime, endTime, googleEventId = ev.id, googleEtag = ev.etag,
+    // 6. Existe appt (etag diferente) → update com title, description, startTime, endTime, allDay = mapped.allDay, googleEventId = ev.id, googleEtag = ev.etag,
     // googleSyncedAt = agora, googleSyncError = null. Se estava CANCELLED e o evento voltou ativo, volta para SCHEDULED.
-    // Lembretes: se há lembrete PENDING, atualizar o remindAt para startTime − appt.reminderMinutesBefore minutos; se startTime mudou para o futuro
-    // e não há lembrete PENDING nem SENT, criar um PENDING (canal TELEGRAM). Auditoria action: 'UPDATE', details
-    // 'Compromisso "<título>" alterado via Google Agenda'. Conta updated. Não enfileirar envio.
+    // Lembretes: se há lembrete PENDING, atualizar o remindAt (se mapped.allDay: allDayRemindAt; senão startTime − reminderMinutes);
+    // se startTime/endTime ainda válido e não há lembrete PENDING nem SENT, criar um PENDING (canal TELEGRAM). Auditoria action: 'UPDATE'.
     if (appt) {
       const newStatus =
         appt.status === AppointmentStatus.CANCELLED
@@ -394,6 +394,7 @@ export class GooglePullService {
           description: mapped.description,
           startTime: mapped.startTime,
           endTime: mapped.endTime,
+          allDay: mapped.allDay,
           googleEventId: ev.id,
           googleEtag: ev.etag ?? null,
           googleSyncedAt: new Date(),
@@ -403,9 +404,11 @@ export class GooglePullService {
       });
 
       const reminderMinutes = appt.reminderMinutesBefore ?? 30;
-      const targetRemindAt = new Date(
-        mapped.startTime.getTime() - reminderMinutes * 60 * 1000,
-      );
+      const targetRemindAt = mapped.allDay
+        ? allDayRemindAt(mapped.startTime)
+        : new Date(
+            mapped.startTime.getTime() - reminderMinutes * 60 * 1000,
+          );
 
       const pendingReminder = await (this.prisma as any).reminder.findFirst({
         where: {
@@ -424,7 +427,11 @@ export class GooglePullService {
             remindAt: targetRemindAt,
           },
         });
-      } else if (mapped.startTime.getTime() > Date.now()) {
+      } else if (
+        mapped.allDay
+          ? mapped.endTime.getTime() > Date.now()
+          : mapped.startTime.getTime() > Date.now()
+      ) {
         const sentReminder = await (this.prisma as any).reminder.findFirst({
           where: {
             appointmentId: appt.id,
@@ -458,9 +465,10 @@ export class GooglePullService {
 
     // 7. Não existe appt:
     // - se endTime < agora − 1 dia → ignorar;
-    // - senão create: calendarId, createdById = calendar.ownerId, title, description, startTime, endTime, reminderMinutesBefore,
-    //   status: SCHEDULED, createdVia: 'GOOGLE', googleEventId = ev.id, googleEtag = ev.etag, googleSyncedAt = agora; e, se
-    //   startTime − reminderMinutesBefore ainda está no futuro, um lembrete PENDING canal TELEGRAM nesse horário.
+    // - senão create: calendarId, createdById = calendar.ownerId, title, description, startTime, endTime, allDay: mapped.allDay,
+    //   reminderMinutesBefore, status: SCHEDULED, createdVia: 'GOOGLE', googleEventId = ev.id, googleEtag = ev.etag, googleSyncedAt = agora;
+    //   Lembrete: quando mapped.allDay, se mapped.endTime > agora, cria lembrete com allDayRemindAt(mapped.startTime);
+    //   senão se startTime − reminderMinutesBefore ainda está no futuro, lembrete PENDING canal TELEGRAM nesse horário.
     //   Auditoria action: 'CREATE', details 'Compromisso "<título>" importado do Google Agenda'. Conta created. Não enfileirar envio.
     // - Se o create falhar por unicidade (P2002, outro ciclo criou ao mesmo tempo) → ignorar.
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -477,6 +485,7 @@ export class GooglePullService {
           description: mapped.description,
           startTime: mapped.startTime,
           endTime: mapped.endTime,
+          allDay: mapped.allDay,
           reminderMinutesBefore: mapped.reminderMinutesBefore,
           status: AppointmentStatus.SCHEDULED,
           createdVia: 'GOOGLE',
@@ -486,18 +495,32 @@ export class GooglePullService {
         },
       });
 
-      const remindAt = new Date(
-        mapped.startTime.getTime() - mapped.reminderMinutesBefore * 60 * 1000,
-      );
-      if (remindAt.getTime() > Date.now()) {
-        await (this.prisma as any).reminder.create({
-          data: {
-            appointmentId: createdAppt.id,
-            remindAt,
-            channel: NotificationChannel.TELEGRAM,
-            status: ReminderStatus.PENDING,
-          },
-        });
+      if (mapped.allDay) {
+        if (mapped.endTime.getTime() > Date.now()) {
+          const remindAt = allDayRemindAt(mapped.startTime);
+          await (this.prisma as any).reminder.create({
+            data: {
+              appointmentId: createdAppt.id,
+              remindAt,
+              channel: NotificationChannel.TELEGRAM,
+              status: ReminderStatus.PENDING,
+            },
+          });
+        }
+      } else {
+        const remindAt = new Date(
+          mapped.startTime.getTime() - mapped.reminderMinutesBefore * 60 * 1000,
+        );
+        if (remindAt.getTime() > Date.now()) {
+          await (this.prisma as any).reminder.create({
+            data: {
+              appointmentId: createdAppt.id,
+              remindAt,
+              channel: NotificationChannel.TELEGRAM,
+              status: ReminderStatus.PENDING,
+            },
+          });
+        }
       }
 
       await this.auditService.log({
