@@ -99,10 +99,18 @@ export class BotWebhookController {
           id: { in: ids },
           calendar: calendarFilter,
         },
-        select: { id: true },
+        select: {
+          id: true,
+          isPrivate: true,
+          calendar: { select: { ownerId: true } },
+        },
       });
 
-      const visibleIds = new Set(visibleAppointments.map((a) => a.id));
+      const visibleIds = new Set(
+        visibleAppointments
+          .filter((a: any) => !a.isPrivate || a.calendar?.ownerId === userId)
+          .map((a: any) => a.id),
+      );
       dispatchedMessages = dispatchedMessages.filter((m) =>
         visibleIds.has(m.appointmentId),
       );

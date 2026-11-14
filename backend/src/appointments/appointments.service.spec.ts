@@ -6,6 +6,7 @@ import { AuditService } from '../audit/audit.service';
 import { CalendarAccessService } from '../calendars/calendar-access.service';
 import { MetricsService } from '../monitoring/metrics.service';
 import { CreateAppointmentDto, UpdateAppointmentDto } from './dto/appointment.dto';
+import { ConflictService } from './conflict.service';
 
 describe('AppointmentsService', () => {
   let service: AppointmentsService;
@@ -13,6 +14,7 @@ describe('AppointmentsService', () => {
   let mockAuditService: any;
   let mockCalendarAccess: any;
   let mockMetricsService: any;
+  let mockConflictService: any;
 
   const baseCalendar = {
     id: 'cal-1',
@@ -69,12 +71,59 @@ describe('AppointmentsService', () => {
       incrementRbacDenied: jest.fn(),
     };
 
+    mockConflictService = {
+      recalculateCalendar: jest.fn().mockResolvedValue(undefined),
+    };
+
     service = new AppointmentsService(
       mockPrisma as unknown as PrismaService,
       mockAuditService as unknown as AuditService,
       mockCalendarAccess as unknown as CalendarAccessService,
       mockMetricsService as unknown as MetricsService,
+      mockConflictService as unknown as ConflictService,
     );
+  });
+
+  describe('findAllForCalendar', () => {
+    it('mascara title e description de compromissos isPrivate para quem não é o dono (inclusive ADMIN)', async () => {
+      const privateAppt = {
+        id: 'app-priv',
+        calendarId: 'cal-1',
+        title: 'Exame Sigiloso',
+        description: 'Informações médicas sigilosas',
+        isPrivate: true,
+        calendar: { owner: { id: 'owner-1' } },
+      };
+
+      mockPrisma.appointment.findMany.mockResolvedValue([privateAppt]);
+
+      // Usuário comum não dono
+      const resultUser = await service.findAllForCalendar('user-2', 'USER', 'cal-1');
+      expect(resultUser[0].title).toBe('Ocupado');
+      expect(resultUser[0].description).toBeNull();
+
+      // Admin não dono também é mascarado
+      const resultAdmin = await service.findAllForCalendar('admin-user', 'ADMIN', 'cal-1');
+      expect(resultAdmin[0].title).toBe('Ocupado');
+      expect(resultAdmin[0].description).toBeNull();
+    });
+
+    it('não mascara para o dono da agenda', async () => {
+      const privateAppt = {
+        id: 'app-priv',
+        calendarId: 'cal-1',
+        title: 'Exame Sigiloso',
+        description: 'Informações médicas sigilosas',
+        isPrivate: true,
+        calendar: { owner: { id: 'owner-1' } },
+      };
+
+      mockPrisma.appointment.findMany.mockResolvedValue([privateAppt]);
+
+      const resultOwner = await service.findAllForCalendar('owner-1', 'USER', 'cal-1');
+      expect(resultOwner[0].title).toBe('Exame Sigiloso');
+      expect(resultOwner[0].description).toBe('Informações médicas sigilosas');
+    });
   });
 
   describe('create', () => {
@@ -389,6 +438,24 @@ describe('AppointmentsService', () => {
         }),
       );
     });
+
+    it('create chama recalculateCalendar e atualiza hasConflict', async () => {
+      mockPrisma.appointment.findUnique.mockResolvedValue({
+        id: 'app-new',
+        hasConflict: true,
+      });
+
+      const dto: CreateAppointmentDto = {
+        calendarId: 'cal-1',
+        title: 'Nova Consulta',
+        startTime: '2026-11-20T10:00:00.000Z',
+      };
+
+      const result = await service.create('user-1', 'USER', dto);
+
+      expect(mockConflictService.recalculateCalendar).toHaveBeenCalledWith('cal-1');
+      expect(result.hasConflict).toBe(true);
+    });
   });
 
   describe('update', () => {
@@ -693,6 +760,64 @@ describe('AppointmentsService', () => {
             after: expect.objectContaining({
               endTime: existing.endTime,
             }),
+          }),
+        }),
+      );
+    });
+
+    it('não-dono não altera título e descrição de compromisso isPrivate', async () => {
+      const existing = {
+        ...baseAppointment,
+        title: 'Consulta Original Privada',
+        description: 'Descrição Original',
+        isPrivate: true,
+      };
+      mockPrisma.appointment.findUnique.mockResolvedValue(existing);
+
+      mockCalendarAccess.verifyAccessOrThrow.mockResolvedValue({
+        calendar: { ...baseCalendar, ownerId: 'owner-1' },
+        isDelegated: true,
+      });
+
+      const dto: UpdateAppointmentDto = {
+        title: 'Título Tentado pela Secretária',
+        description: 'Descrição Tentada',
+      };
+
+      await service.update('secretary-1', 'SECRETARY', 'app-1', dto);
+
+      expect(mockPrisma.appointment.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'app-1' },
+          data: expect.objectContaining({
+            title: 'Consulta Original Privada',
+            description: 'Descrição Original',
+          }),
+        }),
+      );
+      expect(mockConflictService.recalculateCalendar).toHaveBeenCalledWith('cal-1');
+    });
+
+    it('update em compromisso isPrivate registra auditoria com "Compromisso privado" e omite title do metadata', async () => {
+      const existing = {
+        ...baseAppointment,
+        title: 'Exame Super Secreto',
+        isPrivate: true,
+      };
+      mockPrisma.appointment.findUnique.mockResolvedValue(existing);
+
+      const dto: UpdateAppointmentDto = {
+        startTime: '2026-11-20T14:00:00.000Z',
+      };
+
+      await service.update('owner-1', 'USER', 'app-1', dto);
+
+      expect(mockAuditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          details: expect.stringContaining('Compromisso privado'),
+          metadata: expect.objectContaining({
+            before: expect.not.objectContaining({ title: expect.anything() }),
+            after: expect.not.objectContaining({ title: expect.anything() }),
           }),
         }),
       );

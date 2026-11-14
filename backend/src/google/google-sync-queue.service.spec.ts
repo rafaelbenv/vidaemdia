@@ -5,6 +5,7 @@ import { AppointmentsService } from '../appointments/appointments.service';
 import { AuditService } from '../audit/audit.service';
 import { CalendarAccessService } from '../calendars/calendar-access.service';
 import { MetricsService } from '../monitoring/metrics.service';
+import { ConflictService } from '../appointments/conflict.service';
 
 describe('GoogleSyncQueueService', () => {
   let queueService: GoogleSyncQueueService;
@@ -238,6 +239,7 @@ describe('GoogleSyncQueueService', () => {
         mockAuditService as unknown as AuditService,
         mockCalendarAccess as unknown as CalendarAccessService,
         mockMetricsService as unknown as MetricsService,
+        { recalculateCalendar: jest.fn().mockResolvedValue(undefined) } as unknown as ConflictService,
         mockSyncQueue as unknown as GoogleSyncQueueService,
       );
     });

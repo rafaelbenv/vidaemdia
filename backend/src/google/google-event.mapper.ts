@@ -95,6 +95,7 @@ export interface MappedFromGoogleEvent {
   startTime: Date;
   endTime: Date;
   allDay: boolean;
+  isPrivate: boolean;
   reminderMinutesBefore: number;
   vidaemdiaId: string | null;
 }
@@ -103,6 +104,9 @@ export function fromGoogleEvent(ev: any): MappedFromGoogleEvent | null {
   if (!ev?.start) {
     return null;
   }
+
+  const isPrivate =
+    ev.visibility === 'private' || ev.visibility === 'confidential';
 
   let allDay = false;
   let startTime: Date;
@@ -142,6 +146,7 @@ export function fromGoogleEvent(ev: any): MappedFromGoogleEvent | null {
     startTime,
     endTime,
     allDay,
+    isPrivate,
     reminderMinutesBefore,
     vidaemdiaId: ev.extendedProperties?.private?.vidaemdiaId ?? null,
   };

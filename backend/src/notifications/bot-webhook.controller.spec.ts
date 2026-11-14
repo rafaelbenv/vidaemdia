@@ -116,7 +116,11 @@ describe('BotWebhookController', () => {
             ],
           },
         },
-        select: { id: true },
+        select: {
+          id: true,
+          isPrivate: true,
+          calendar: { select: { ownerId: true } },
+        },
       });
 
       expect(result.reminders).toEqual(mockReminders);
@@ -124,6 +128,38 @@ describe('BotWebhookController', () => {
       expect(result.dispatchedMessages).toHaveLength(1);
       expect(result.dispatchedMessages[0].appointmentId).toBe('apt-1');
       expect(result.worker).toEqual({ isRunning: false, lastRun: null });
+    });
+
+    it('com usuário USER: esconde mensagens de compromissos isPrivate cuja agenda não é do usuário, mas exibe se for o dono', async () => {
+      const userId = 'user-carlos';
+      const req = {
+        user: {
+          sub: userId,
+          role: UserRole.USER,
+        },
+      };
+
+      const dispatched = [
+        { id: 'msg-1', appointmentId: 'apt-priv-other', message: 'Lembrete privado outro' },
+        { id: 'msg-2', appointmentId: 'apt-priv-own', message: 'Lembrete privado meu' },
+        { id: 'msg-3', appointmentId: 'apt-pub-other', message: 'Lembrete público outro' },
+      ];
+      mockProvider.getDispatchedMessages.mockReturnValue(dispatched);
+
+      mockPrisma.appointment.findMany.mockResolvedValue([
+        { id: 'apt-priv-other', isPrivate: true, calendar: { ownerId: 'other-user' } },
+        { id: 'apt-priv-own', isPrivate: true, calendar: { ownerId: userId } },
+        { id: 'apt-pub-other', isPrivate: false, calendar: { ownerId: 'other-user' } },
+      ]);
+
+      const result = await controller.getStatus(req);
+
+      // apt-priv-other deve ser filtrado; apt-priv-own e apt-pub-other devem permanecer
+      expect(result.dispatchedMessages).toHaveLength(2);
+      expect(result.dispatchedMessages.map((m) => m.appointmentId)).toEqual([
+        'apt-priv-own',
+        'apt-pub-other',
+      ]);
     });
 
     it('com ADMIN: findMany sem where de agenda; todas as mensagens despachadas retornadas', async () => {

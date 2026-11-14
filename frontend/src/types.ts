@@ -83,9 +83,11 @@ export interface Appointment {
   startTime: string;
   endTime: string;
   allDay?: boolean;
+  hasConflict?: boolean;
+  isPrivate?: boolean;
   reminderMinutesBefore: number;
   status: AppointmentStatus;
-  createdVia: 'WEB' | 'TELEGRAM';
+  createdVia: 'WEB' | 'TELEGRAM' | 'GOOGLE';
   createdBy?: User;
   calendar?: {
     id: string;

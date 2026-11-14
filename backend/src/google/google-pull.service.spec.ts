@@ -18,6 +18,7 @@ import {
 } from './google-calendar.client';
 import { GoogleInvalidGrantError } from './google-oauth.client';
 import { AuditService } from '../audit/audit.service';
+import { ConflictService } from '../appointments/conflict.service';
 
 describe('GooglePullService', () => {
   let service: GooglePullService;
@@ -26,6 +27,7 @@ describe('GooglePullService', () => {
   let mockCalendarClient: any;
   let mockAuditService: any;
   let mockMetricsService: any;
+  let mockConflictService: any;
 
   const originalEnv = { ...process.env };
   const validHexKey =
@@ -71,6 +73,7 @@ describe('GooglePullService', () => {
       },
       googleSyncJob: {
         findFirst: jest.fn().mockResolvedValue(null),
+        update: jest.fn().mockResolvedValue({ id: 'job-1', status: 'DONE' }),
       },
     };
 
@@ -94,12 +97,17 @@ describe('GooglePullService', () => {
       incrementGoogleSync: jest.fn(),
     };
 
+    mockConflictService = {
+      recalculateCalendar: jest.fn().mockResolvedValue(undefined),
+    };
+
     service = new GooglePullService(
       mockPrisma as unknown as PrismaService,
       mockGoogleAccountService as unknown as GoogleAccountService,
       mockCalendarClient as unknown as GoogleCalendarClient,
       mockAuditService as unknown as AuditService,
       mockMetricsService as unknown as MetricsService,
+      mockConflictService as unknown as ConflictService,
     );
   });
 
@@ -272,6 +280,7 @@ describe('GooglePullService', () => {
         startTime: futureStart,
         endTime: futureEnd,
         allDay: false,
+        isPrivate: false,
         reminderMinutesBefore: 15,
         status: AppointmentStatus.SCHEDULED,
         createdVia: 'GOOGLE',
@@ -361,6 +370,7 @@ describe('GooglePullService', () => {
         startTime: start,
         endTime: end,
         allDay: false,
+        isPrivate: false,
         googleEventId: 'g-event-existing',
         googleEtag: '"etag-different"',
         googleSyncedAt: expect.any(Date),
@@ -519,7 +529,9 @@ describe('GooglePullService', () => {
 
     const res = await service.pullCalendar('cal-1');
 
-    expect(res.updated).toBe(1);
+    // grava o googleEventId e o etag; depois o etag igual mostra que é o eco do próprio envio
+    expect(res.ignored).toBe(1);
+    expect(res.updated).toBe(0);
     expect(mockPrisma.appointment.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'vidaemdia-id-456' },
@@ -705,5 +717,268 @@ describe('GooglePullService', () => {
 
     expect(result.calendars).toBe(0);
     expect(mockPrisma.calendar.findMany).not.toHaveBeenCalled();
+  });
+
+  it("visibility: 'private' grava isPrivate e auditoria 'Compromisso privado'", async () => {
+    const futureStart = new Date(Date.now() + 2 * 3600 * 1000);
+    const futureEnd = new Date(Date.now() + 3 * 3600 * 1000);
+
+    const ev = {
+      id: 'g-priv-1',
+      etag: '"etag-priv"',
+      summary: 'Consulta Sigilosa',
+      visibility: 'private',
+      start: { dateTime: futureStart.toISOString() },
+      end: { dateTime: futureEnd.toISOString() },
+    };
+
+    mockCalendarClient.listEvents.mockResolvedValue({
+      items: [ev],
+      nextSyncToken: 'sync-priv',
+    });
+    mockPrisma.appointment.create.mockResolvedValue({
+      id: 'appt-priv-created',
+      title: 'Consulta Sigilosa',
+      isPrivate: true,
+    });
+
+    const result = await service.pullCalendar('cal-1');
+
+    expect(result.created).toBe(1);
+    expect(mockPrisma.appointment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          isPrivate: true,
+        }),
+      }),
+    );
+    expect(mockAuditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        details: 'Compromisso privado importado do Google Agenda',
+      }),
+    );
+  });
+
+  it('convite recusado cancela o compromisso e gera auditoria específica', async () => {
+    const localAppt = {
+      id: 'appt-declined-1',
+      title: 'Reunião com Especialista',
+      status: AppointmentStatus.SCHEDULED,
+      googleEventId: 'g-declined-1',
+      googleEtag: '"old-etag"',
+      isPrivate: false,
+    };
+    mockPrisma.appointment.findFirst.mockResolvedValue(localAppt);
+
+    const ev = {
+      id: 'g-declined-1',
+      etag: '"etag-declined"',
+      summary: 'Reunião com Especialista',
+      attendees: [
+        { email: 'user@example.com', self: true, responseStatus: 'declined' },
+      ],
+      start: { dateTime: new Date(Date.now() + 3600 * 1000).toISOString() },
+      end: { dateTime: new Date(Date.now() + 2 * 3600 * 1000).toISOString() },
+    };
+
+    mockCalendarClient.listEvents.mockResolvedValue({
+      items: [ev],
+      nextSyncToken: 'sync-declined',
+    });
+
+    const res = await service.pullCalendar('cal-1');
+
+    expect(res.cancelled).toBe(1);
+    expect(mockPrisma.appointment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'appt-declined-1' },
+        data: expect.objectContaining({
+          status: AppointmentStatus.CANCELLED,
+          googleEventId: 'g-declined-1',
+        }),
+      }),
+    );
+    expect(mockPrisma.reminder.deleteMany).toHaveBeenCalledWith({
+      where: {
+        appointmentId: 'appt-declined-1',
+        status: ReminderStatus.PENDING,
+      },
+    });
+    expect(mockAuditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'CANCEL',
+        details: 'Compromisso "Reunião com Especialista" cancelado: convite recusado no Google Agenda',
+      }),
+    );
+  });
+
+  it('job PENDING com Google mais novo → job vira DONE e o evento é aplicado', async () => {
+    const start = new Date(Date.now() + 2 * 3600 * 1000);
+    const end = new Date(Date.now() + 3 * 3600 * 1000);
+    const localUpdatedAt = new Date('2026-11-20T10:00:00.000Z');
+    const googleUpdated = new Date('2026-11-20T10:05:00.000Z');
+
+    const localAppt = {
+      id: 'appt-job-newer',
+      title: 'Título Antigo',
+      googleEventId: 'g-ev-newer',
+      googleEtag: '"etag-old"',
+      status: AppointmentStatus.SCHEDULED,
+      updatedAt: localUpdatedAt,
+      isPrivate: false,
+    };
+    mockPrisma.appointment.findFirst.mockResolvedValue(localAppt);
+    mockPrisma.googleSyncJob.findFirst.mockResolvedValue({
+      id: 'job-pending-1',
+      status: 'PENDING',
+    });
+
+    mockCalendarClient.listEvents.mockResolvedValue({
+      items: [
+        {
+          id: 'g-ev-newer',
+          etag: '"etag-new"',
+          summary: 'Título Novo do Google',
+          updated: googleUpdated.toISOString(),
+          start: { dateTime: start.toISOString() },
+          end: { dateTime: end.toISOString() },
+        },
+      ],
+      nextSyncToken: 'sync-newer',
+    });
+
+    const res = await service.pullCalendar('cal-1');
+
+    expect(res.updated).toBe(1);
+    expect(mockPrisma.googleSyncJob.update).toHaveBeenCalledWith({
+      where: { id: 'job-pending-1' },
+      data: {
+        status: 'DONE',
+        lastError: 'Substituído por alteração mais recente no Google Agenda',
+        claimedAt: null,
+        claimedBy: null,
+      },
+    });
+    expect(mockPrisma.appointment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'appt-job-newer' },
+        data: expect.objectContaining({
+          title: 'Título Novo do Google',
+        }),
+      }),
+    );
+  });
+
+  it('job PENDING com local mais novo → ignorado', async () => {
+    const start = new Date(Date.now() + 2 * 3600 * 1000);
+    const end = new Date(Date.now() + 3 * 3600 * 1000);
+    const localUpdatedAt = new Date('2026-11-20T10:10:00.000Z');
+    const googleUpdated = new Date('2026-11-20T10:05:00.000Z');
+
+    const localAppt = {
+      id: 'appt-local-newer',
+      title: 'Título Local Mais Novo',
+      googleEventId: 'g-ev-loc',
+      googleEtag: '"etag-old"',
+      status: AppointmentStatus.SCHEDULED,
+      updatedAt: localUpdatedAt,
+      isPrivate: false,
+    };
+    mockPrisma.appointment.findFirst.mockResolvedValue(localAppt);
+    mockPrisma.googleSyncJob.findFirst.mockResolvedValue({
+      id: 'job-pending-2',
+      status: 'PENDING',
+    });
+
+    mockCalendarClient.listEvents.mockResolvedValue({
+      items: [
+        {
+          id: 'g-ev-loc',
+          etag: '"etag-new"',
+          summary: 'Título Antigo do Google',
+          updated: googleUpdated.toISOString(),
+          start: { dateTime: start.toISOString() },
+          end: { dateTime: end.toISOString() },
+        },
+      ],
+      nextSyncToken: 'sync-loc',
+    });
+
+    const res = await service.pullCalendar('cal-1');
+
+    expect(res.ignored).toBe(1);
+    expect(res.updated).toBe(0);
+    expect(mockPrisma.googleSyncJob.update).not.toHaveBeenCalled();
+    expect(mockPrisma.appointment.update).not.toHaveBeenCalled();
+  });
+
+  it('job PROCESSING → ignorado', async () => {
+    const start = new Date(Date.now() + 2 * 3600 * 1000);
+    const end = new Date(Date.now() + 3 * 3600 * 1000);
+
+    const localAppt = {
+      id: 'appt-processing',
+      title: 'Em Processamento',
+      googleEventId: 'g-ev-proc',
+      googleEtag: '"etag-old"',
+      status: AppointmentStatus.SCHEDULED,
+      updatedAt: new Date(),
+    };
+    mockPrisma.appointment.findFirst.mockResolvedValue(localAppt);
+    mockPrisma.googleSyncJob.findFirst.mockResolvedValue({
+      id: 'job-proc-1',
+      status: 'PROCESSING',
+    });
+
+    mockCalendarClient.listEvents.mockResolvedValue({
+      items: [
+        {
+          id: 'g-ev-proc',
+          etag: '"etag-new"',
+          summary: 'Mudança no Google',
+          updated: new Date(Date.now() + 10000).toISOString(),
+          start: { dateTime: start.toISOString() },
+          end: { dateTime: end.toISOString() },
+        },
+      ],
+      nextSyncToken: 'sync-proc',
+    });
+
+    const res = await service.pullCalendar('cal-1');
+
+    expect(res.ignored).toBe(1);
+    expect(res.updated).toBe(0);
+    expect(mockPrisma.appointment.update).not.toHaveBeenCalled();
+  });
+
+  it('recalculateCalendar chamado quando houve mudança e não chamado quando tudo foi ignorado', async () => {
+    const futureStart = new Date(Date.now() + 2 * 3600 * 1000);
+    const futureEnd = new Date(Date.now() + 3 * 3600 * 1000);
+    mockCalendarClient.listEvents.mockResolvedValueOnce({
+      items: [
+        {
+          id: 'g-ev-change',
+          etag: '"etag-change"',
+          summary: 'Evento Novo',
+          start: { dateTime: futureStart.toISOString() },
+          end: { dateTime: futureEnd.toISOString() },
+        },
+      ],
+      nextSyncToken: 'sync-change',
+    });
+    mockPrisma.appointment.findFirst.mockResolvedValueOnce(null);
+
+    await service.pullCalendar('cal-1');
+    expect(mockConflictService.recalculateCalendar).toHaveBeenCalledWith('cal-1');
+
+    mockConflictService.recalculateCalendar.mockClear();
+
+    mockCalendarClient.listEvents.mockResolvedValueOnce({
+      items: [],
+      nextSyncToken: 'sync-no-change',
+    });
+
+    await service.pullCalendar('cal-1');
+    expect(mockConflictService.recalculateCalendar).not.toHaveBeenCalled();
   });
 });
