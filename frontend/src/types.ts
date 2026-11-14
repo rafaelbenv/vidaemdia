@@ -119,6 +119,7 @@ export interface AuditLogMetadataAppointmentSnapshot {
   title?: string;
   startTime?: string;
   endTime?: string;
+  allDay?: boolean;
   status?: string;
 }
 
@@ -126,6 +127,7 @@ export interface AuditLogMetadata {
   title?: string;
   startTime?: string;
   endTime?: string;
+  allDay?: boolean;
   reminderChannel?: string;
   reminderMinutesBefore?: number;
   isDelegated?: boolean;
@@ -269,6 +271,7 @@ export interface CreateAppointmentBody {
   description?: string;
   startTime: string;
   endTime?: string;
+  allDay?: boolean;
   reminderMinutesBefore?: number;
   reminderEnabled?: boolean;
   reminderChannel?: NotificationChannel;
@@ -279,6 +282,7 @@ export interface UpdateAppointmentBody {
   description?: string;
   startTime?: string;
   endTime?: string;
+  allDay?: boolean;
   reminderMinutesBefore?: number;
   reminderEnabled?: boolean;
   reminderChannel?: NotificationChannel;

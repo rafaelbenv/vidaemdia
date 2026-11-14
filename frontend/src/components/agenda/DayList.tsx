@@ -12,6 +12,7 @@ export interface DayListProps {
   ownerId: string;
   ownerTelegramLinked: boolean;
   isOwnCalendar?: boolean;
+  isOwner?: boolean;
   canCreate?: boolean;
   onConnectTelegram: () => void;
   onOpen: (a: Appointment) => void;
@@ -25,16 +26,25 @@ export function DayList({
   ownerId,
   ownerTelegramLinked,
   isOwnCalendar = true,
+  isOwner,
   canCreate = true,
   onConnectTelegram,
   onOpen,
   onNew,
 }: DayListProps) {
+  const isOwnerResolved = isOwner !== undefined ? isOwner : isOwnCalendar;
   const [showCancelled, setShowCancelled] = useState(false);
 
-  const sorted = [...appointments].sort(
-    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
-  );
+  const sorted = [...appointments].sort((a, b) => {
+    const aAllDay = Boolean(a.allDay);
+    const bAllDay = Boolean(b.allDay);
+    if (aAllDay && !bAllDay) return -1;
+    if (!aAllDay && bAllDay) return 1;
+    if (aAllDay && bAllDay) {
+      return (a.title || '').localeCompare(b.title || '');
+    }
+    return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+  });
   const active = sorted.filter((a) => a.status !== 'CANCELLED');
   const cancelled = sorted.filter((a) => a.status === 'CANCELLED');
 
@@ -46,6 +56,7 @@ export function DayList({
 
   if (isToday) {
     for (const appt of active) {
+      if (appt.allDay) continue;
       const start = new Date(appt.startTime);
       const end = new Date(appt.endTime);
       if (start <= now && now < end) {
@@ -56,6 +67,7 @@ export function DayList({
 
     if (!ongoingApptId) {
       for (const appt of active) {
+        if (appt.allDay) continue;
         const start = new Date(appt.startTime);
         if (start > now) {
           firstFutureApptId = appt.id;
@@ -97,6 +109,7 @@ export function DayList({
                     ? firstName(appt.createdBy.name)
                     : null
                 }
+                isOwner={isOwnerResolved}
                 onConnectTelegram={onConnectTelegram}
                 onOpen={onOpen}
               />
@@ -163,6 +176,7 @@ export function DayList({
               marker={marker}
               reminder={reminder}
               createdByOther={createdByOther}
+              isOwner={isOwnerResolved}
               onConnectTelegram={onConnectTelegram}
               onOpen={onOpen}
             />

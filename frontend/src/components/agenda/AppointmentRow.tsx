@@ -10,6 +10,7 @@ export interface AppointmentRowProps {
   marker: string | null;
   reminder: ReturnType<typeof reminderLine>;
   createdByOther: string | null;
+  isOwner?: boolean;
   onConnectTelegram: () => void;
   onOpen: (appt: Appointment) => void;
 }
@@ -20,6 +21,7 @@ export function AppointmentRow({
   marker,
   reminder,
   createdByOther,
+  isOwner = true,
   onConnectTelegram,
   onOpen,
 }: AppointmentRowProps) {
@@ -27,8 +29,8 @@ export function AppointmentRow({
 
   const timeClass =
     isCancelled || isPast
-      ? 'text-sm font-semibold tabular-nums text-stone-500'
-      : 'text-sm font-semibold tabular-nums text-stone-900';
+      ? `${appt.allDay ? 'text-xs' : 'text-sm'} font-semibold tabular-nums text-stone-500`
+      : `${appt.allDay ? 'text-xs' : 'text-sm'} font-semibold tabular-nums text-stone-900`;
 
   const titleClass = isCancelled
     ? 'text-sm font-medium line-through text-stone-500 truncate'
@@ -51,7 +53,9 @@ export function AppointmentRow({
     >
       {/* Esquerda */}
       <div className="w-14 shrink-0">
-        <span className={timeClass}>{formatTime(appt.startTime)}</span>
+        <span className={timeClass}>
+          {appt.allDay ? 'Dia inteiro' : formatTime(appt.startTime)}
+        </span>
       </div>
 
       {/* Centro */}
@@ -61,6 +65,22 @@ export function AppointmentRow({
           {marker && !isCancelled && (
             <span className="text-[11px] font-semibold text-brand-800 bg-brand-50 rounded px-1.5 py-0.5 shrink-0">
               {marker}
+            </span>
+          )}
+          {!isCancelled && appt.hasConflict && (
+            <span className="text-[11px] font-semibold rounded px-1.5 py-0.5 shrink-0 text-amber-800 bg-amber-50 inline-flex items-center gap-1">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              <span>Conflito de horário</span>
+            </span>
+          )}
+          {!isCancelled && appt.createdVia === 'GOOGLE' && (
+            <span className="text-[11px] font-semibold rounded px-1.5 py-0.5 shrink-0 text-stone-600 bg-stone-100">
+              Google
+            </span>
+          )}
+          {!isCancelled && appt.isPrivate && isOwner && (
+            <span className="text-[11px] font-semibold rounded px-1.5 py-0.5 shrink-0 text-stone-600 bg-stone-100">
+              Privado
             </span>
           )}
         </div>

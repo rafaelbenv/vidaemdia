@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronRight, Loader2, X } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Loader2, X } from 'lucide-react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { Appointment, Calendar } from '../../types';
 import { checkIsPast, todayStr } from '../../lib/format';
@@ -12,6 +12,7 @@ export interface AppointmentFormValues {
   endTime: string;
   description: string;
   reminder: 'none' | number;
+  allDay: boolean;
 }
 
 export interface AppointmentPanelProps {
@@ -23,6 +24,7 @@ export interface AppointmentPanelProps {
   canCancel: boolean;
   saving: boolean;
   serverError: string | null;
+  isOwner?: boolean;
   onClose: () => void;
   onSubmit: (values: AppointmentFormValues) => void;
   onRequestCancel: () => void;
@@ -46,12 +48,14 @@ export function AppointmentPanel({
   canCancel,
   saving,
   serverError,
+  isOwner = true,
   onClose,
   onSubmit,
   onRequestCancel,
 }: AppointmentPanelProps) {
   const isEdit = mode === 'edit' && Boolean(appointment);
   const isCancelled = appointment?.status === 'CANCELLED';
+  const isPrivateNotOwner = Boolean(appointment?.isPrivate && !isOwner);
 
   const isOneHour = useMemo(() => {
     if (!isEdit || !appointment?.endTime) return true;
@@ -82,6 +86,7 @@ export function AppointmentPanel({
   const [description, setDescription] = useState(() => {
     return isEdit && appointment?.description ? appointment.description : '';
   });
+  const [allDay, setAllDay] = useState(() => (isEdit && appointment ? (appointment.allDay ?? false) : false));
 
   const [reminder, setReminder] = useState<'none' | number>(() => {
     if (isEdit && appointment) {
@@ -138,6 +143,12 @@ export function AppointmentPanel({
   }, [onClose]);
 
   const reminderOptions = useMemo(() => {
+    if (allDay) {
+      return [
+        { value: 0, label: 'Às 8h do dia' },
+        { value: 'none', label: 'Sem lembrete' },
+      ];
+    }
     const options = [...STANDARD_REMINDER_OPTIONS];
     if (
       typeof reminder === 'number' &&
@@ -146,7 +157,7 @@ export function AppointmentPanel({
       options.push({ value: reminder, label: `${reminder} minutos antes` });
     }
     return options;
-  }, [reminder]);
+  }, [allDay, reminder]);
 
   const disabled = isCancelled || !canEdit || saving;
 
@@ -164,19 +175,28 @@ export function AppointmentPanel({
       newErrors.title = 'Diga o que é o compromisso.';
     }
 
-    if (!date || !time) {
-      newErrors.dateTime = 'Escolha o dia e o horário.';
-    } else if (mode === 'create' && checkIsPast(date, time)) {
-      newErrors.dateTime = 'Escolha um horário a partir de agora.';
-    }
+    if (allDay) {
+      const today = toDateKey(new Date());
+      if (!date) {
+        newErrors.dateTime = 'Escolha o dia.';
+      } else if (mode === 'create' && date < today) {
+        newErrors.dateTime = 'Escolha um dia a partir de hoje.';
+      }
+    } else {
+      if (!date || !time) {
+        newErrors.dateTime = 'Escolha o dia e o horário.';
+      } else if (mode === 'create' && checkIsPast(date, time)) {
+        newErrors.dateTime = 'Escolha um horário a partir de agora.';
+      }
 
-    if (time && endTime) {
-      const [startH, startM] = time.split(':').map(Number);
-      const [endH, endM] = endTime.split(':').map(Number);
-      const startMinutes = startH * 60 + startM;
-      const endMinutes = endH * 60 + endM;
-      if (endMinutes <= startMinutes) {
-        newErrors.endTime = 'O término deve ser depois do início.';
+      if (time && endTime) {
+        const [startH, startM] = time.split(':').map(Number);
+        const [endH, endM] = endTime.split(':').map(Number);
+        const startMinutes = startH * 60 + startM;
+        const endMinutes = endH * 60 + endM;
+        if (endMinutes <= startMinutes) {
+          newErrors.endTime = 'O término deve ser depois do início.';
+        }
       }
     }
 
@@ -189,10 +209,11 @@ export function AppointmentPanel({
     onSubmit({
       title,
       date,
-      time,
-      endTime,
+      time: allDay ? '00:00' : time,
+      endTime: allDay ? '' : endTime,
       description,
       reminder,
+      allDay,
     });
   };
 
@@ -231,6 +252,17 @@ export function AppointmentPanel({
 
           {/* Corpo rolável */}
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+            {/* Aviso de conflito de horário */}
+            {appointment?.hasConflict && (
+              <div
+                role="status"
+                className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 flex items-center gap-2"
+              >
+                <AlertTriangle className="w-4 h-4 shrink-0 text-amber-800" />
+                <span>Este horário se sobrepõe a outro compromisso da agenda.</span>
+              </div>
+            )}
+
             {/* Linha da agenda */}
             <div className="flex items-center gap-2 text-sm text-stone-600">
               <span
@@ -274,7 +306,7 @@ export function AppointmentPanel({
                 ref={titleInputRef}
                 id="appt-title"
                 type="text"
-                disabled={disabled}
+                disabled={disabled || isPrivateNotOwner}
                 placeholder="Consulta com Dr. João"
                 value={title}
                 onChange={(e) => {
@@ -289,11 +321,21 @@ export function AppointmentPanel({
                   {errors.title}
                 </p>
               )}
+              {appointment?.createdVia === 'GOOGLE' && (
+                <p className="text-xs text-stone-500 mt-1.5">
+                  Veio do Google Agenda.
+                </p>
+              )}
+              {isPrivateNotOwner && (
+                <p className="text-xs text-stone-500 mt-1.5">
+                  Compromisso particular do dono da agenda. Você pode mudar o horário ou cancelar.
+                </p>
+              )}
             </div>
 
             {/* Campo 2: Dia e Horário */}
             <div>
-              <div className="grid grid-cols-2 gap-3">
+              {allDay ? (
                 <div>
                   <label htmlFor="appt-date" className="block text-sm font-medium text-stone-700 mb-1">
                     Dia
@@ -311,29 +353,68 @@ export function AppointmentPanel({
                     className="w-full border border-stone-300 rounded-md px-3 py-2 text-sm min-h-[44px] focus:ring-2 focus:ring-brand-700 focus:outline-none disabled:bg-stone-100 disabled:text-stone-500"
                   />
                 </div>
-                <div>
-                  <label htmlFor="appt-time" className="block text-sm font-medium text-stone-700 mb-1">
-                    Horário
-                  </label>
-                  <input
-                    id="appt-time"
-                    type="time"
-                    disabled={disabled}
-                    value={time}
-                    onChange={(e) => {
-                      setTime(e.target.value);
-                      if (errors.dateTime) setErrors((prev) => ({ ...prev, dateTime: undefined }));
-                    }}
-                    aria-describedby={errors.dateTime ? 'appt-datetime-error' : undefined}
-                    className="w-full border border-stone-300 rounded-md px-3 py-2 text-sm min-h-[44px] focus:ring-2 focus:ring-brand-700 focus:outline-none disabled:bg-stone-100 disabled:text-stone-500"
-                  />
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="appt-date" className="block text-sm font-medium text-stone-700 mb-1">
+                      Dia
+                    </label>
+                    <input
+                      id="appt-date"
+                      type="date"
+                      disabled={disabled}
+                      value={date}
+                      onChange={(e) => {
+                        setDate(e.target.value);
+                        if (errors.dateTime) setErrors((prev) => ({ ...prev, dateTime: undefined }));
+                      }}
+                      aria-describedby={errors.dateTime ? 'appt-datetime-error' : undefined}
+                      className="w-full border border-stone-300 rounded-md px-3 py-2 text-sm min-h-[44px] focus:ring-2 focus:ring-brand-700 focus:outline-none disabled:bg-stone-100 disabled:text-stone-500"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="appt-time" className="block text-sm font-medium text-stone-700 mb-1">
+                      Horário
+                    </label>
+                    <input
+                      id="appt-time"
+                      type="time"
+                      disabled={disabled}
+                      value={time}
+                      onChange={(e) => {
+                        setTime(e.target.value);
+                        if (errors.dateTime) setErrors((prev) => ({ ...prev, dateTime: undefined }));
+                      }}
+                      aria-describedby={errors.dateTime ? 'appt-datetime-error' : undefined}
+                      className="w-full border border-stone-300 rounded-md px-3 py-2 text-sm min-h-[44px] focus:ring-2 focus:ring-brand-700 focus:outline-none disabled:bg-stone-100 disabled:text-stone-500"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
               {errors.dateTime && (
                 <p id="appt-datetime-error" className="text-xs text-red-600 mt-1">
                   {errors.dateTime}
                 </p>
               )}
+
+              {/* Caixa de seleção "Dia inteiro" logo abaixo do campo de data/horário */}
+              <div className="mt-2.5">
+                <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-stone-700">
+                  <input
+                    type="checkbox"
+                    id="appt-allday"
+                    checked={allDay}
+                    disabled={disabled}
+                    onChange={(e) => {
+                      setAllDay(e.target.checked);
+                      if (errors.dateTime) setErrors((prev) => ({ ...prev, dateTime: undefined }));
+                      if (errors.endTime) setErrors((prev) => ({ ...prev, endTime: undefined }));
+                    }}
+                    className="rounded border-stone-300 text-brand-700 focus:ring-brand-700 h-4 w-4"
+                  />
+                  <span>Dia inteiro</span>
+                </label>
+              </div>
             </div>
 
             {/* Campo 3: Lembrete no Telegram */}
@@ -344,7 +425,7 @@ export function AppointmentPanel({
               <select
                 id="appt-reminder"
                 disabled={disabled}
-                value={String(reminder)}
+                value={allDay ? (reminder === 'none' ? 'none' : '0') : String(reminder)}
                 onChange={(e) => {
                   const val = e.target.value;
                   setReminder(val === 'none' ? 'none' : Number(val));
@@ -377,31 +458,33 @@ export function AppointmentPanel({
 
               {showMoreOptions && (
                 <div className="mt-3 space-y-4 pl-1">
-                  <div>
-                    <label
-                      htmlFor="appt-endtime"
-                      className="block text-sm font-medium text-stone-700 mb-1"
-                    >
-                      Término
-                    </label>
-                    <input
-                      id="appt-endtime"
-                      type="time"
-                      disabled={disabled}
-                      value={endTime}
-                      onChange={(e) => {
-                        setEndTime(e.target.value);
-                        if (errors.endTime) setErrors((prev) => ({ ...prev, endTime: undefined }));
-                      }}
-                      aria-describedby={errors.endTime ? 'appt-endtime-error' : undefined}
-                      className="w-full border border-stone-300 rounded-md px-3 py-2 text-sm min-h-[44px] focus:ring-2 focus:ring-brand-700 focus:outline-none disabled:bg-stone-100 disabled:text-stone-500"
-                    />
-                    {errors.endTime && (
-                      <p id="appt-endtime-error" className="text-xs text-red-600 mt-1">
-                        {errors.endTime}
-                      </p>
-                    )}
-                  </div>
+                  {!allDay && (
+                    <div>
+                      <label
+                        htmlFor="appt-endtime"
+                        className="block text-sm font-medium text-stone-700 mb-1"
+                      >
+                        Término
+                      </label>
+                      <input
+                        id="appt-endtime"
+                        type="time"
+                        disabled={disabled}
+                        value={endTime}
+                        onChange={(e) => {
+                          setEndTime(e.target.value);
+                          if (errors.endTime) setErrors((prev) => ({ ...prev, endTime: undefined }));
+                        }}
+                        aria-describedby={errors.endTime ? 'appt-endtime-error' : undefined}
+                        className="w-full border border-stone-300 rounded-md px-3 py-2 text-sm min-h-[44px] focus:ring-2 focus:ring-brand-700 focus:outline-none disabled:bg-stone-100 disabled:text-stone-500"
+                      />
+                      {errors.endTime && (
+                        <p id="appt-endtime-error" className="text-xs text-red-600 mt-1">
+                          {errors.endTime}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   <div>
                     <label
@@ -413,7 +496,7 @@ export function AppointmentPanel({
                     <textarea
                       id="appt-desc"
                       rows={3}
-                      disabled={disabled}
+                      disabled={disabled || isPrivateNotOwner}
                       placeholder="Observações, link da reunião ou preparo..."
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}

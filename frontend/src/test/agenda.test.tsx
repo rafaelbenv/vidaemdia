@@ -213,4 +213,93 @@ describe('Agenda', () => {
     expect(await screen.findByRole('heading', { name: 'Terça, 10 de novembro' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^dia$/i })).toHaveAttribute('aria-pressed', 'true');
   });
+
+  it('compromisso allDay mostra "Dia inteiro" e aparece antes de um compromisso com horário no mesmo dia', async () => {
+    const api = installMockApi();
+    api.appointments.push({
+      id: 'appt-all-day',
+      calendarId: 'cal-dr-joao-prof',
+      createdById: 'user-dr-joao',
+      title: 'Congresso Médico',
+      description: 'Congresso de Cardiologia',
+      startTime: '2026-11-10T00:00:00.000-03:00',
+      endTime: '2026-11-10T23:59:59.000-03:00',
+      allDay: true,
+      reminderMinutesBefore: 0,
+      status: 'SCHEDULED',
+      createdVia: 'WEB',
+      reminders: [],
+    });
+
+    renderApp({
+      path: '/agenda?dia=2026-11-10',
+      token: 'token-user-dr-joao',
+    });
+
+    expect(await screen.findByText('Dia inteiro')).toBeInTheDocument();
+    expect(screen.getByText('Congresso Médico')).toBeInTheDocument();
+
+    const titles = screen.getAllByText(/Congresso Médico|Consulta inicial/);
+    expect(titles[0]).toHaveTextContent('Congresso Médico');
+    expect(titles[1]).toHaveTextContent('Consulta inicial');
+  });
+
+  it('hasConflict mostra "Conflito de horário"; createdVia: "GOOGLE" mostra "Google"', async () => {
+    const api = installMockApi();
+    api.appointments.push(
+      {
+        id: 'appt-conflict',
+        calendarId: 'cal-dr-joao-prof',
+        createdById: 'user-dr-joao',
+        title: 'Cirurgia de emergência',
+        description: null,
+        startTime: '2026-11-10T08:30:00.000-03:00',
+        endTime: '2026-11-10T09:30:00.000-03:00',
+        hasConflict: true,
+        reminderMinutesBefore: 30,
+        status: 'SCHEDULED',
+        createdVia: 'WEB',
+        reminders: [],
+      },
+      {
+        id: 'appt-google',
+        calendarId: 'cal-dr-joao-prof',
+        createdById: 'user-dr-joao',
+        title: 'Reunião do Hospital',
+        description: null,
+        startTime: '2026-11-10T12:00:00.000-03:00',
+        endTime: '2026-11-10T13:00:00.000-03:00',
+        createdVia: 'GOOGLE',
+        reminderMinutesBefore: 30,
+        status: 'SCHEDULED',
+        reminders: [],
+      },
+    );
+
+    renderApp({
+      path: '/agenda?dia=2026-11-10',
+      token: 'token-user-dr-joao',
+    });
+
+    expect(await screen.findByText('Conflito de horário')).toBeInTheDocument();
+    expect(screen.getByText('Google')).toBeInTheDocument();
+  });
+
+  it('no painel, marcar "Dia inteiro" esconde o campo de horário', async () => {
+    const { user } = renderApp({
+      path: '/agenda?dia=2026-11-10',
+      token: 'token-user-dr-joao',
+    });
+
+    const newBtn = await screen.findByRole('button', { name: /\+ novo compromisso/i });
+    await user.click(newBtn);
+
+    expect(await screen.findByRole('heading', { name: 'Novo compromisso' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/horário/i)).toBeInTheDocument();
+
+    const allDayCheckbox = screen.getByLabelText(/dia inteiro/i);
+    await user.click(allDayCheckbox);
+
+    expect(screen.queryByLabelText(/horário/i)).not.toBeInTheDocument();
+  });
 });

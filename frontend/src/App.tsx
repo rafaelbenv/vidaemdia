@@ -714,36 +714,64 @@ export function App() {
     setPanelError(null);
 
     try {
-      const start = new Date(`${values.date}T${values.time}`);
-      const end = values.endTime ? new Date(`${values.date}T${values.endTime}`) : undefined;
-
       let savedAppt: Appointment;
 
-      if (panel.mode === 'create') {
-        const body: CreateAppointmentBody = {
-          calendarId: selectedCalendarId,
-          title: values.title.trim(),
-          description: values.description.trim() || undefined,
-          startTime: start.toISOString(),
-          endTime: end ? end.toISOString() : undefined,
-          reminderEnabled: values.reminder !== 'none',
-          reminderMinutesBefore: values.reminder === 'none' ? undefined : Number(values.reminder),
-          reminderChannel: 'TELEGRAM',
-        };
-        savedAppt = await createAppointment(token, body);
-      } else {
-        const body: UpdateAppointmentBody = {
-          title: values.title.trim(),
-          description: values.description.trim() === '' ? '' : values.description.trim(),
-          startTime: start.toISOString(),
-          reminderEnabled: values.reminder !== 'none',
-          reminderMinutesBefore: values.reminder === 'none' ? undefined : Number(values.reminder),
-          reminderChannel: 'TELEGRAM',
-        };
-        if (end) {
-          body.endTime = end.toISOString();
+      if (values.allDay) {
+        const startTime = new Date(`${values.date}T00:00`).toISOString();
+
+        if (panel.mode === 'create') {
+          const body: CreateAppointmentBody = {
+            calendarId: selectedCalendarId,
+            title: values.title.trim(),
+            description: values.description.trim() || undefined,
+            startTime,
+            allDay: true,
+            reminderEnabled: values.reminder !== 'none',
+            reminderChannel: 'TELEGRAM',
+          };
+          savedAppt = await createAppointment(token, body);
+        } else {
+          const body: UpdateAppointmentBody = {
+            title: values.title.trim(),
+            description: values.description.trim() === '' ? '' : values.description.trim(),
+            startTime,
+            allDay: true,
+            reminderEnabled: values.reminder !== 'none',
+            reminderChannel: 'TELEGRAM',
+          };
+          savedAppt = await updateAppointment(token, panel.appointmentId, body);
         }
-        savedAppt = await updateAppointment(token, panel.appointmentId, body);
+      } else {
+        const start = new Date(`${values.date}T${values.time}`);
+        const end = values.endTime ? new Date(`${values.date}T${values.endTime}`) : undefined;
+
+        if (panel.mode === 'create') {
+          const body: CreateAppointmentBody = {
+            calendarId: selectedCalendarId,
+            title: values.title.trim(),
+            description: values.description.trim() || undefined,
+            startTime: start.toISOString(),
+            endTime: end ? end.toISOString() : undefined,
+            reminderEnabled: values.reminder !== 'none',
+            reminderMinutesBefore: values.reminder === 'none' ? undefined : Number(values.reminder),
+            reminderChannel: 'TELEGRAM',
+          };
+          savedAppt = await createAppointment(token, body);
+        } else {
+          const body: UpdateAppointmentBody = {
+            title: values.title.trim(),
+            description: values.description.trim() === '' ? '' : values.description.trim(),
+            startTime: start.toISOString(),
+            allDay: false,
+            reminderEnabled: values.reminder !== 'none',
+            reminderMinutesBefore: values.reminder === 'none' ? undefined : Number(values.reminder),
+            reminderChannel: 'TELEGRAM',
+          };
+          if (end) {
+            body.endTime = end.toISOString();
+          }
+          savedAppt = await updateAppointment(token, panel.appointmentId, body);
+        }
       }
 
       setPanel(null);
@@ -1240,6 +1268,7 @@ export function App() {
               : undefined
           }
           calendar={activeCalendar}
+          isOwner={activeCalendar?.ownerId === user?.id}
           defaultDate={
             (panel.mode === 'create' && panel.date) ||
             new URLSearchParams(location.search).get('dia') ||
