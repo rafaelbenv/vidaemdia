@@ -20,6 +20,7 @@ import { GoogleInvalidGrantError } from './google-oauth.client';
 import { googleConfig } from './google.config';
 import { fromGoogleEvent } from './google-event.mapper';
 import { allDayRemindAt } from '../appointments/all-day.util';
+import { ConflictService } from '../appointments/conflict.service';
 
 export interface PullCounters {
   created: number;
@@ -44,6 +45,7 @@ export class GooglePullService {
     private readonly calendarClient: GoogleCalendarClient,
     private readonly auditService: AuditService,
     private readonly metricsService: MetricsService,
+    private readonly conflictService: ConflictService,
   ) {}
 
   @Cron(process.env.GOOGLE_PULL_CRON_EXPRESSION || '*/1 * * * *')
@@ -254,6 +256,10 @@ export class GooglePullService {
         }
       }
 
+      if (created + updated + cancelled > 0) {
+        await this.conflictService.recalculateCalendar(calendar.id);
+      }
+
       await (this.prisma as any).calendar.update({
         where: { id: calendar.id },
         data: {
@@ -299,33 +305,117 @@ export class GooglePullService {
       });
     }
 
-    // 2. Envio pendente vence: se appt existe e há googleSyncJob dele com status PENDING ou PROCESSING → ignorar (contar ignored).
-    // Se o appt foi achado pelo vidaemdiaId e está sem googleEventId, gravar googleEventId = ev.id e googleEtag = ev.etag mesmo assim.
+    // Achado pelo vidaemdiaId sem googleEventId grava googleEventId/googleEtag antes de decidir
+    if (appt && !appt.googleEventId && vidaemdiaId) {
+      await (this.prisma as any).appointment.update({
+        where: { id: appt.id },
+        data: {
+          googleEventId: ev.id,
+          googleEtag: ev.etag ?? null,
+        },
+      });
+      appt.googleEventId = ev.id;
+      appt.googleEtag = ev.etag ?? null;
+    }
+
+    // 2. Última alteração vence:
+    // - Se existe job com status PROCESSING → ignorar (o próximo ciclo vê de novo)
+    // - Se existe job PENDING: comparar new Date(ev.updated) com appt.updatedAt:
+    //   Google mais novo (ou ev.updated ausente → considera o local mais novo, ignora):
+    //   marcar o job como DONE com lastError: 'Substituído por alteração mais recente no Google Agenda', claimedAt/claimedBy: null, e seguir aplicando
+    //   Local mais novo ou igual → ignorar
     if (appt) {
-      const pendingJob = await (this.prisma as any).googleSyncJob.findFirst({
+      const activeJob = await (this.prisma as any).googleSyncJob.findFirst({
         where: {
           appointmentId: appt.id,
           status: { in: ['PENDING', 'PROCESSING'] },
         },
       });
 
-      if (pendingJob) {
-        if (!appt.googleEventId && vidaemdiaId) {
-          await (this.prisma as any).appointment.update({
-            where: { id: appt.id },
-            data: {
-              googleEventId: ev.id,
-              googleEtag: ev.etag ?? null,
-            },
-          });
-          appt.googleEventId = ev.id;
-          appt.googleEtag = ev.etag ?? null;
+      if (activeJob) {
+        if (activeJob.status === 'PROCESSING') {
+          return 'ignored';
         }
-        return 'ignored';
+
+        if (activeJob.status === 'PENDING') {
+          if (!ev.updated) {
+            return 'ignored';
+          }
+
+          const googleUpdated = new Date(ev.updated);
+          if (isNaN(googleUpdated.getTime())) {
+            return 'ignored';
+          }
+
+          const localUpdatedAt = appt.updatedAt
+            ? new Date(appt.updatedAt)
+            : new Date(0);
+
+          if (googleUpdated.getTime() > localUpdatedAt.getTime()) {
+            await (this.prisma as any).googleSyncJob.update({
+              where: { id: activeJob.id },
+              data: {
+                status: 'DONE',
+                lastError:
+                  'Substituído por alteração mais recente no Google Agenda',
+                claimedAt: null,
+                claimedBy: null,
+              },
+            });
+          } else {
+            return 'ignored';
+          }
+        }
       }
     }
 
-    // 3. ev.status === 'cancelled':
+    // 3. Convite recusado: antes de cancelled, se ev.attendees?.some((a) => a.self && a.responseStatus === 'declined')
+    const isDeclined =
+      Array.isArray(ev.attendees) &&
+      ev.attendees.some(
+        (a: any) => a?.self && a?.responseStatus === 'declined',
+      );
+
+    if (isDeclined) {
+      if (!appt || appt.status === AppointmentStatus.CANCELLED) {
+        return 'ignored';
+      }
+
+      await (this.prisma as any).appointment.update({
+        where: { id: appt.id },
+        data: {
+          status: AppointmentStatus.CANCELLED,
+          googleEventId: ev.id,
+          googleEtag: ev.etag ?? appt.googleEtag ?? null,
+          googleSyncedAt: new Date(),
+        },
+      });
+
+      await (this.prisma as any).reminder.deleteMany({
+        where: {
+          appointmentId: appt.id,
+          status: ReminderStatus.PENDING,
+        },
+      });
+
+      const titleLabel = appt.isPrivate
+        ? 'Compromisso privado'
+        : `Compromisso "${appt.title}"`;
+
+      await this.auditService.log({
+        actorUserId: undefined,
+        targetCalendarId: calendar.id,
+        entityType: 'APPOINTMENT',
+        entityId: appt.id,
+        action: 'CANCEL',
+        details: `${titleLabel} cancelado: convite recusado no Google Agenda`,
+        metadata: { source: 'GOOGLE', googleEventId: ev.id },
+      });
+
+      return 'cancelled';
+    }
+
+    // 4. ev.status === 'cancelled':
     // - sem appt ou appt.status === CANCELLED → ignorar;
     // - senão: appt.status = CANCELLED, googleEtag = ev.etag ?? appt.googleEtag, googleSyncedAt = agora; apagar os lembretes PENDING dele;
     //   auditoria { actorUserId: undefined, targetCalendarId, entityType: 'APPOINTMENT', entityId: appt.id, action: 'CANCEL',
@@ -353,31 +443,35 @@ export class GooglePullService {
         },
       });
 
+      const titleLabel = appt.isPrivate
+        ? 'Compromisso privado'
+        : `Compromisso "${appt.title}"`;
+
       await this.auditService.log({
         actorUserId: undefined,
         targetCalendarId: calendar.id,
         entityType: 'APPOINTMENT',
         entityId: appt.id,
         action: 'CANCEL',
-        details: `Compromisso "${appt.title}" cancelado via Google Agenda`,
+        details: `${titleLabel} cancelado via Google Agenda`,
         metadata: { source: 'GOOGLE', googleEventId: ev.id },
       });
 
       return 'cancelled';
     }
 
-    // 4. fromGoogleEvent(ev) devolve null (evento sem data válida) → ignorar.
+    // 5. fromGoogleEvent(ev) devolve null (evento sem data válida) → ignorar.
     const mapped = fromGoogleEvent(ev);
     if (!mapped) {
       return 'ignored';
     }
 
-    // 5. Existe appt e appt.googleEtag === ev.etag → ignorar (é o eco do próprio envio).
+    // 6. Existe appt e appt.googleEtag === ev.etag → ignorar (é o eco do próprio envio).
     if (appt && appt.googleEtag && ev.etag && appt.googleEtag === ev.etag) {
       return 'ignored';
     }
 
-    // 6. Existe appt (etag diferente) → update com title, description, startTime, endTime, allDay = mapped.allDay, googleEventId = ev.id, googleEtag = ev.etag,
+    // 7. Existe appt (etag diferente) → update com title, description, startTime, endTime, allDay = mapped.allDay, isPrivate = mapped.isPrivate, googleEventId = ev.id, googleEtag = ev.etag,
     // googleSyncedAt = agora, googleSyncError = null. Se estava CANCELLED e o evento voltou ativo, volta para SCHEDULED.
     // Lembretes: se há lembrete PENDING, atualizar o remindAt (se mapped.allDay: allDayRemindAt; senão startTime − reminderMinutes);
     // se startTime/endTime ainda válido e não há lembrete PENDING nem SENT, criar um PENDING (canal TELEGRAM). Auditoria action: 'UPDATE'.
@@ -395,6 +489,7 @@ export class GooglePullService {
           startTime: mapped.startTime,
           endTime: mapped.endTime,
           allDay: mapped.allDay,
+          isPrivate: mapped.isPrivate,
           googleEventId: ev.id,
           googleEtag: ev.etag ?? null,
           googleSyncedAt: new Date(),
@@ -450,22 +545,26 @@ export class GooglePullService {
         }
       }
 
+      const titleLabel = mapped.isPrivate
+        ? 'Compromisso privado'
+        : `Compromisso "${mapped.title}"`;
+
       await this.auditService.log({
         actorUserId: undefined,
         targetCalendarId: calendar.id,
         entityType: 'APPOINTMENT',
         entityId: appt.id,
         action: 'UPDATE',
-        details: `Compromisso "${mapped.title}" alterado via Google Agenda`,
+        details: `${titleLabel} alterado via Google Agenda`,
         metadata: { source: 'GOOGLE', googleEventId: ev.id },
       });
 
       return 'updated';
     }
 
-    // 7. Não existe appt:
+    // 8. Não existe appt:
     // - se endTime < agora − 1 dia → ignorar;
-    // - senão create: calendarId, createdById = calendar.ownerId, title, description, startTime, endTime, allDay: mapped.allDay,
+    // - senão create: calendarId, createdById = calendar.ownerId, title, description, startTime, endTime, allDay: mapped.allDay, isPrivate: mapped.isPrivate,
     //   reminderMinutesBefore, status: SCHEDULED, createdVia: 'GOOGLE', googleEventId = ev.id, googleEtag = ev.etag, googleSyncedAt = agora;
     //   Lembrete: quando mapped.allDay, se mapped.endTime > agora, cria lembrete com allDayRemindAt(mapped.startTime);
     //   senão se startTime − reminderMinutesBefore ainda está no futuro, lembrete PENDING canal TELEGRAM nesse horário.
@@ -486,6 +585,7 @@ export class GooglePullService {
           startTime: mapped.startTime,
           endTime: mapped.endTime,
           allDay: mapped.allDay,
+          isPrivate: mapped.isPrivate,
           reminderMinutesBefore: mapped.reminderMinutesBefore,
           status: AppointmentStatus.SCHEDULED,
           createdVia: 'GOOGLE',
@@ -523,13 +623,17 @@ export class GooglePullService {
         }
       }
 
+      const titleLabel = mapped.isPrivate
+        ? 'Compromisso privado'
+        : `Compromisso "${mapped.title}"`;
+
       await this.auditService.log({
         actorUserId: undefined,
         targetCalendarId: calendar.id,
         entityType: 'APPOINTMENT',
         entityId: createdAppt.id,
         action: 'CREATE',
-        details: `Compromisso "${mapped.title}" importado do Google Agenda`,
+        details: `${titleLabel} importado do Google Agenda`,
         metadata: { source: 'GOOGLE', googleEventId: ev.id },
       });
 

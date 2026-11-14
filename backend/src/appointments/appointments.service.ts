@@ -6,6 +6,7 @@ import { CalendarAccessService } from '../calendars/calendar-access.service';
 import { MetricsService } from '../monitoring/metrics.service';
 import { CreateAppointmentDto, UpdateAppointmentDto } from './dto/appointment.dto';
 import { GoogleSyncQueueService } from '../google/google-sync-queue.service';
+import { ConflictService } from './conflict.service';
 import { addDays, allDayRemindAt, normalizeAllDayRange } from './all-day.util';
 
 @Injectable()
@@ -15,6 +16,7 @@ export class AppointmentsService {
     private readonly auditService: AuditService,
     private readonly calendarAccess: CalendarAccessService,
     private readonly metricsService: MetricsService,
+    private readonly conflictService: ConflictService,
     @Optional() private readonly googleSyncQueue?: GoogleSyncQueueService,
   ) {}
 
@@ -22,7 +24,7 @@ export class AppointmentsService {
     // Etapa 3 do Fluxo RBAC: Verifica JWT + papel + permissão de visualização na agenda
     await this.calendarAccess.verifyAccessOrThrow(userId, userRole, calendarId, 'VIEW', ipAddress);
 
-    return this.prisma.appointment.findMany({
+    const appointments = await this.prisma.appointment.findMany({
       where: { calendarId },
       include: {
         createdBy: { select: { id: true, name: true, email: true, role: true } },
@@ -32,6 +34,18 @@ export class AppointmentsService {
         },
       },
       orderBy: { startTime: 'asc' },
+    });
+
+    return appointments.map((appt) => {
+      const ownerId = appt.calendar?.owner?.id || (appt as any).calendar?.ownerId;
+      if (appt.isPrivate && userId !== ownerId) {
+        return {
+          ...appt,
+          title: 'Ocupado',
+          description: null,
+        };
+      }
+      return appt;
     });
   }
 
@@ -154,25 +168,43 @@ export class AppointmentsService {
 
     this.metricsService.incrementAppointmentCreated(createdVia);
 
+    const titleLabel = appointment.isPrivate
+      ? 'Compromisso privado'
+      : `Compromisso "${appointment.title}"`;
+
+    const metadata: any = {
+      startTime: appointment.startTime,
+      endTime: appointment.endTime,
+      allDay: appointment.allDay,
+      reminderChannel: channel,
+      reminderMinutesBefore,
+      isDelegated,
+      createdVia,
+    };
+    if (!appointment.isPrivate) {
+      metadata.title = appointment.title;
+    }
+
     await this.auditService.log({
       actorUserId: userId,
       targetCalendarId: dto.calendarId,
       entityType: 'APPOINTMENT',
       entityId: appointment.id,
       action: 'CREATE',
-      details: `${isDelegated ? '[Fluxo RBAC Delegado] ' : ''}Compromisso "${appointment.title}" criado na agenda "${calendar.name}" via ${createdVia}.`,
-      metadata: {
-        title: appointment.title,
-        startTime: appointment.startTime,
-        endTime: appointment.endTime,
-        allDay: appointment.allDay,
-        reminderChannel: channel,
-        reminderMinutesBefore,
-        isDelegated,
-        createdVia,
-      },
+      details: `${isDelegated ? '[Fluxo RBAC Delegado] ' : ''}${titleLabel} criado na agenda "${calendar.name}" via ${createdVia}.`,
+      metadata,
       ipAddress,
     });
+
+    await this.conflictService.recalculateCalendar(dto.calendarId);
+
+    const fresh = await this.prisma.appointment.findUnique({
+      where: { id: appointment.id },
+      select: { hasConflict: true },
+    });
+    if (fresh) {
+      appointment.hasConflict = fresh.hasConflict;
+    }
 
     if (calendar.googleCalendarId && this.googleSyncQueue) {
       const syncOp =
@@ -266,11 +298,17 @@ export class AppointmentsService {
 
     const reminderMinutesBefore = dto.reminderMinutesBefore ?? existing.reminderMinutesBefore;
 
+    const isPrivateNonOwner = existing.isPrivate && userId !== calendar.ownerId;
+    const targetTitle = isPrivateNonOwner ? existing.title : (dto.title ?? existing.title);
+    const targetDescription = isPrivateNonOwner
+      ? existing.description
+      : (dto.description !== undefined ? dto.description : existing.description);
+
     await this.prisma.appointment.update({
       where: { id: appointmentId },
       data: {
-        title: dto.title ?? existing.title,
-        description: dto.description !== undefined ? dto.description : existing.description,
+        title: targetTitle,
+        description: targetDescription,
         startTime,
         endTime,
         allDay,
@@ -342,6 +380,8 @@ export class AppointmentsService {
       }
     }
 
+    await this.conflictService.recalculateCalendar(existing.calendarId);
+
     const updated = await this.prisma.appointment.findUnique({
       where: { id: appointmentId },
       include: {
@@ -350,30 +390,43 @@ export class AppointmentsService {
       },
     });
 
+    const isPrivate = updated?.isPrivate ?? existing.isPrivate;
+    const titleLabel = isPrivate
+      ? 'Compromisso privado'
+      : `Compromisso "${updated?.title ?? existing.title}"`;
+
+    const beforeMetadata: any = {
+      startTime: existing.startTime,
+      endTime: existing.endTime,
+      allDay: existing.allDay,
+      status: existing.status,
+    };
+    if (!isPrivate) {
+      beforeMetadata.title = existing.title;
+    }
+
+    const afterMetadata: any = {
+      startTime: updated.startTime,
+      endTime: updated.endTime,
+      allDay: updated.allDay,
+      status: updated.status,
+    };
+    if (!isPrivate) {
+      afterMetadata.title = updated.title;
+    }
+
     await this.auditService.log({
       actorUserId: userId,
       targetCalendarId: existing.calendarId,
       entityType: 'APPOINTMENT',
       entityId: appointmentId,
       action: operation,
-      details: `${isDelegated ? '[Fluxo RBAC Delegado] ' : ''}Compromisso "${updated.title}" ${
+      details: `${isDelegated ? '[Fluxo RBAC Delegado] ' : ''}${titleLabel} ${
         operation === 'CANCEL' ? 'cancelado' : 'atualizado'
       } na agenda "${calendar.name}".`,
       metadata: {
-        before: {
-          title: existing.title,
-          startTime: existing.startTime,
-          endTime: existing.endTime,
-          allDay: existing.allDay,
-          status: existing.status,
-        },
-        after: {
-          title: updated.title,
-          startTime: updated.startTime,
-          endTime: updated.endTime,
-          allDay: updated.allDay,
-          status: updated.status,
-        },
+        before: beforeMetadata,
+        after: afterMetadata,
         isDelegated,
       },
       ipAddress,

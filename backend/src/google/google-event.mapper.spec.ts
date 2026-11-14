@@ -120,6 +120,7 @@ describe('fromGoogleEvent', () => {
       startTime: new Date('2026-11-20T03:00:00.000Z'),
       endTime: new Date('2026-11-21T03:00:00.000Z'),
       allDay: true,
+      isPrivate: false,
       reminderMinutesBefore: 30,
       vidaemdiaId: null,
     });
@@ -162,6 +163,7 @@ describe('fromGoogleEvent', () => {
       startTime: new Date('2026-11-20T14:00:00.000Z'),
       endTime: new Date('2026-11-20T15:00:00.000Z'),
       allDay: false,
+      isPrivate: false,
       reminderMinutesBefore: 15,
       vidaemdiaId: 'appt-dentista-1',
     });
@@ -197,5 +199,32 @@ describe('fromGoogleEvent', () => {
 
     expect(fromGoogleEvent(evSemTitulo)?.title).toBe('(Sem título)');
     expect(fromGoogleEvent(evEspacos)?.title).toBe('(Sem título)');
+  });
+
+  it('visibility private ou confidential deve definir isPrivate como true, default ou ausente como false', () => {
+    const evPrivate = {
+      summary: 'Consulta Sigilosa',
+      visibility: 'private',
+      start: { dateTime: '2026-11-20T10:00:00.000Z' },
+      end: { dateTime: '2026-11-20T11:00:00.000Z' },
+    };
+
+    const evConfidential = {
+      summary: 'Consulta Confidencial',
+      visibility: 'confidential',
+      start: { dateTime: '2026-11-20T10:00:00.000Z' },
+      end: { dateTime: '2026-11-20T11:00:00.000Z' },
+    };
+
+    const evDefault = {
+      summary: 'Consulta Pública',
+      visibility: 'default',
+      start: { dateTime: '2026-11-20T10:00:00.000Z' },
+      end: { dateTime: '2026-11-20T11:00:00.000Z' },
+    };
+
+    expect(fromGoogleEvent(evPrivate)?.isPrivate).toBe(true);
+    expect(fromGoogleEvent(evConfidential)?.isPrivate).toBe(true);
+    expect(fromGoogleEvent(evDefault)?.isPrivate).toBe(false);
   });
 });
