@@ -6,6 +6,7 @@ import { CalendarAccessService } from '../calendars/calendar-access.service';
 import { MetricsService } from '../monitoring/metrics.service';
 import { CreateAppointmentDto, UpdateAppointmentDto } from './dto/appointment.dto';
 import { GoogleSyncQueueService } from '../google/google-sync-queue.service';
+import { addDays, allDayRemindAt, normalizeAllDayRange } from './all-day.util';
 
 @Injectable()
 export class AppointmentsService {
@@ -62,25 +63,40 @@ export class AppointmentsService {
       ipAddress,
     );
 
-    const startTime = new Date(dto.startTime);
-    if (isNaN(startTime.getTime())) {
+    const rawStartTime = new Date(dto.startTime);
+    if (isNaN(rawStartTime.getTime())) {
       throw new BadRequestException('Data/horário de início inválido');
     }
 
-    const endTime = dto.endTime
-      ? new Date(dto.endTime)
-      : new Date(startTime.getTime() + 60 * 60 * 1000); // Padrão: 1 hora de duração
+    const allDay = dto.allDay === true;
+    let startTime: Date;
+    let endTime: Date;
 
-    if (endTime <= startTime) {
-      throw new BadRequestException('O horário de término deve ser posterior ao horário de início');
+    if (allDay) {
+      const normalized = normalizeAllDayRange(
+        rawStartTime,
+        dto.endTime ? new Date(dto.endTime) : undefined,
+      );
+      startTime = normalized.startTime;
+      endTime = normalized.endTime;
+    } else {
+      startTime = rawStartTime;
+      endTime = dto.endTime
+        ? new Date(dto.endTime)
+        : new Date(startTime.getTime() + 60 * 60 * 1000); // Padrão: 1 hora de duração
+
+      if (endTime <= startTime) {
+        throw new BadRequestException('O horário de término deve ser posterior ao horário de início');
+      }
     }
 
     // Validação de Conflito de Horários (Double-Booking) em agendas profissionais
-    if (calendar.type === CalendarType.PROFESSIONAL) {
+    if (!allDay && calendar.type === CalendarType.PROFESSIONAL) {
       const conflict = await this.prisma.appointment.findFirst({
         where: {
           calendarId: dto.calendarId,
           status: AppointmentStatus.SCHEDULED,
+          allDay: false,
           AND: [
             { startTime: { lt: endTime } },
             { endTime: { gt: startTime } },
@@ -96,7 +112,9 @@ export class AppointmentsService {
     }
 
     const reminderMinutesBefore = dto.reminderMinutesBefore ?? 30;
-    const remindAt = this.computeRemindAt(startTime, reminderMinutesBefore);
+    const remindAt = allDay
+      ? allDayRemindAt(startTime)
+      : this.computeRemindAt(startTime, reminderMinutesBefore);
 
     const channel = dto.reminderChannel || NotificationChannel.TELEGRAM;
 
@@ -107,6 +125,7 @@ export class AppointmentsService {
       description: dto.description?.trim() || null,
       startTime,
       endTime,
+      allDay,
       reminderMinutesBefore,
       status: AppointmentStatus.SCHEDULED,
       createdVia,
@@ -146,6 +165,7 @@ export class AppointmentsService {
         title: appointment.title,
         startTime: appointment.startTime,
         endTime: appointment.endTime,
+        allDay: appointment.allDay,
         reminderChannel: channel,
         reminderMinutesBefore,
         isDelegated,
@@ -188,30 +208,48 @@ export class AppointmentsService {
       ipAddress,
     );
 
-    const startTime = dto.startTime ? new Date(dto.startTime) : existing.startTime;
+    const allDay = dto.allDay !== undefined ? dto.allDay : (existing.allDay ?? false);
+    let startTime: Date;
     let endTime: Date;
-    if (dto.startTime && !dto.endTime) {
-      endTime = new Date(startTime.getTime() + (existing.endTime.getTime() - existing.startTime.getTime()));
-    } else if (dto.endTime) {
-      endTime = new Date(dto.endTime);
+
+    if (allDay) {
+      const startInput = dto.startTime ? new Date(dto.startTime) : existing.startTime;
+      const endInput = dto.endTime
+        ? new Date(dto.endTime)
+        : (dto.startTime ? undefined : addDays(existing.endTime, -1));
+      const normalized = normalizeAllDayRange(startInput, endInput);
+      startTime = normalized.startTime;
+      endTime = normalized.endTime;
     } else {
-      endTime = existing.endTime;
+      startTime = dto.startTime ? new Date(dto.startTime) : existing.startTime;
+      if (existing.allDay && !allDay && !dto.endTime) {
+        endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
+      } else if (dto.startTime && !dto.endTime) {
+        endTime = new Date(startTime.getTime() + (existing.endTime.getTime() - existing.startTime.getTime()));
+      } else if (dto.endTime) {
+        endTime = new Date(dto.endTime);
+      } else {
+        endTime = existing.endTime;
+      }
+
+      if (endTime <= startTime) {
+        throw new BadRequestException('O horário de término deve ser posterior ao horário de início');
+      }
     }
 
-    if (endTime <= startTime) {
-      throw new BadRequestException('O horário de término deve ser posterior ao horário de início');
-    }
-
+    const allDayChanged = allDay !== existing.allDay;
     const timeChanged =
+      allDayChanged ||
       startTime.getTime() !== existing.startTime.getTime() ||
       endTime.getTime() !== existing.endTime.getTime();
 
-    if (operation === 'UPDATE' && calendar.type === CalendarType.PROFESSIONAL && timeChanged) {
+    if (!allDay && operation === 'UPDATE' && calendar.type === CalendarType.PROFESSIONAL && timeChanged) {
       const conflict = await this.prisma.appointment.findFirst({
         where: {
           calendarId: existing.calendarId,
           id: { not: appointmentId },
           status: AppointmentStatus.SCHEDULED,
+          allDay: false,
           AND: [
             { startTime: { lt: endTime } },
             { endTime: { gt: startTime } },
@@ -235,6 +273,7 @@ export class AppointmentsService {
         description: dto.description !== undefined ? dto.description : existing.description,
         startTime,
         endTime,
+        allDay,
         reminderMinutesBefore,
         status: dto.status ?? existing.status,
       },
@@ -266,7 +305,9 @@ export class AppointmentsService {
           dto.reminderEnabled === true ||
           dto.reminderChannel)
       ) {
-        const remindAt = this.computeRemindAt(startTime, reminderMinutesBefore);
+        const remindAt = allDay
+          ? allDayRemindAt(startTime)
+          : this.computeRemindAt(startTime, reminderMinutesBefore);
         const hasPending = existingReminders.some((r) => r.status === ReminderStatus.PENDING);
 
         if (hasPending) {
@@ -282,7 +323,7 @@ export class AppointmentsService {
             (r) => r.remindAt && new Date(r.remindAt).getTime() === remindAt.getTime(),
           );
 
-          if (remindAt > new Date() && !alreadyExists) {
+          if ((allDay ? endTime > new Date() : remindAt > new Date()) && !alreadyExists) {
             const channel =
               dto.reminderChannel ??
               existingReminders[0]?.channel ??
@@ -323,12 +364,14 @@ export class AppointmentsService {
           title: existing.title,
           startTime: existing.startTime,
           endTime: existing.endTime,
+          allDay: existing.allDay,
           status: existing.status,
         },
         after: {
           title: updated.title,
           startTime: updated.startTime,
           endTime: updated.endTime,
+          allDay: updated.allDay,
           status: updated.status,
         },
         isDelegated,

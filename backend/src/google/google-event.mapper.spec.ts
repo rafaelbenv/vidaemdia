@@ -16,10 +16,12 @@ describe('toGoogleEvent', () => {
       summary: 'Consulta Médica',
       description: 'Retorno de exames',
       start: {
+        date: null,
         dateTime: '2026-11-20T10:00:00.000Z',
         timeZone: 'America/Sao_Paulo',
       },
       end: {
+        date: null,
         dateTime: '2026-11-20T11:00:00.000Z',
         timeZone: 'America/Sao_Paulo',
       },
@@ -48,10 +50,12 @@ describe('toGoogleEvent', () => {
     expect(result.summary).toBe('Reunião de Alinhamento');
     expect(result.description).toBeUndefined();
     expect(result.start).toEqual({
+      date: null,
       dateTime: '2026-11-25T14:30:00.000Z',
       timeZone: 'America/Sao_Paulo',
     });
     expect(result.end).toEqual({
+      date: null,
       dateTime: '2026-11-25T15:30:00.000Z',
       timeZone: 'America/Sao_Paulo',
     });
@@ -62,17 +66,63 @@ describe('toGoogleEvent', () => {
       },
     });
   });
+
+  it('toGoogleEvent com allDay usa date e define dateTime e timeZone como null', () => {
+    const appt = {
+      id: 'appt-allday-1',
+      title: 'Congresso Médico',
+      description: 'Presencial',
+      startTime: new Date('2026-11-20T03:00:00.000Z'),
+      endTime: new Date('2026-11-21T03:00:00.000Z'),
+      allDay: true,
+    };
+
+    const result = toGoogleEvent(appt);
+
+    expect(result).toEqual({
+      summary: 'Congresso Médico',
+      description: 'Presencial',
+      start: {
+        date: '2026-11-20',
+        dateTime: null,
+        timeZone: null,
+      },
+      end: {
+        date: '2026-11-21',
+        dateTime: null,
+        timeZone: null,
+      },
+      reminders: {
+        useDefault: true,
+      },
+      extendedProperties: {
+        private: {
+          vidaemdiaId: 'appt-allday-1',
+        },
+      },
+    });
+  });
 });
 
 describe('fromGoogleEvent', () => {
-  it('dia inteiro sem start.dateTime deve retornar null', () => {
+  it('dia inteiro com start.date deve mapear para allDay: true e horários certos', () => {
     const ev = {
       summary: 'Feriado Nacional',
       start: { date: '2026-11-20' },
       end: { date: '2026-11-21' },
     };
 
-    expect(fromGoogleEvent(ev)).toBeNull();
+    const result = fromGoogleEvent(ev);
+
+    expect(result).toEqual({
+      title: 'Feriado Nacional',
+      description: null,
+      startTime: new Date('2026-11-20T03:00:00.000Z'),
+      endTime: new Date('2026-11-21T03:00:00.000Z'),
+      allDay: true,
+      reminderMinutesBefore: 30,
+      vidaemdiaId: null,
+    });
   });
 
   it('sem end.dateTime deve retornar null', () => {
@@ -111,6 +161,7 @@ describe('fromGoogleEvent', () => {
       description: 'Limpeza semestral',
       startTime: new Date('2026-11-20T14:00:00.000Z'),
       endTime: new Date('2026-11-20T15:00:00.000Z'),
+      allDay: false,
       reminderMinutesBefore: 15,
       vidaemdiaId: 'appt-dentista-1',
     });
@@ -129,6 +180,7 @@ describe('fromGoogleEvent', () => {
     const result = fromGoogleEvent(ev);
 
     expect(result?.reminderMinutesBefore).toBe(30);
+    expect(result?.allDay).toBe(false);
   });
 
   it('sem título ou título com espaços em branco deve retornar "(Sem título)"', () => {

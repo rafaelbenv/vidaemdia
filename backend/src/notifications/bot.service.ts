@@ -162,6 +162,9 @@ export class BotService implements OnModuleInit {
       const listText = upcoming
         .map((a, idx) => {
           const dt = a.startTime.toLocaleDateString('pt-BR', { timeZone });
+          if (a.allDay) {
+            return `${idx + 1}. <b>${escapeHtml(a.title)}</b> — ${dt} (dia inteiro)`;
+          }
           const tm = a.startTime.toLocaleTimeString('pt-BR', {
             hour: '2-digit',
             minute: '2-digit',

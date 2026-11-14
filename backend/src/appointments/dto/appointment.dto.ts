@@ -37,6 +37,14 @@ export class CreateAppointmentDto {
   @IsDateString({}, { message: 'Informe uma data/hora de término válida (ISO 8601)' })
   endTime?: string;
 
+  @ApiPropertyOptional({
+    description: 'Dia inteiro: ignora a hora; endTime é o último dia (inclusive)',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  allDay?: boolean;
+
   @ApiPropertyOptional({ default: true })
   @IsOptional()
   @IsBoolean()
@@ -79,6 +87,13 @@ export class UpdateAppointmentDto {
   @IsOptional()
   @IsDateString()
   endTime?: string;
+
+  @ApiPropertyOptional({
+    description: 'Dia inteiro: ignora a hora; endTime é o último dia (inclusive)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  allDay?: boolean;
 
   @ApiPropertyOptional({ default: true })
   @IsOptional()

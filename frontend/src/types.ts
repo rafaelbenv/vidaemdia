@@ -82,6 +82,7 @@ export interface Appointment {
   description?: string | null;
   startTime: string;
   endTime: string;
+  allDay?: boolean;
   reminderMinutesBefore: number;
   status: AppointmentStatus;
   createdVia: 'WEB' | 'TELEGRAM';
