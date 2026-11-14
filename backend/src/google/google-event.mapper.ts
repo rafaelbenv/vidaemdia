@@ -60,3 +60,38 @@ export function toGoogleEvent(
     },
   };
 }
+
+export interface MappedFromGoogleEvent {
+  title: string;
+  description: string | null;
+  startTime: Date;
+  endTime: Date;
+  reminderMinutesBefore: number;
+  vidaemdiaId: string | null;
+}
+
+export function fromGoogleEvent(ev: any): MappedFromGoogleEvent | null {
+  if (!ev?.start?.dateTime || !ev?.end?.dateTime) {
+    return null;
+  }
+
+  let reminderMinutesBefore = 30;
+  if (Array.isArray(ev.reminders?.overrides)) {
+    const popupOverride = ev.reminders.overrides.find(
+      (o: any) => o?.method === 'popup' && typeof o?.minutes === 'number',
+    );
+    if (popupOverride) {
+      reminderMinutesBefore = popupOverride.minutes;
+    }
+  }
+
+  return {
+    title: (ev.summary ?? '').trim() || '(Sem título)',
+    description: ev.description ?? null,
+    startTime: new Date(ev.start.dateTime),
+    endTime: new Date(ev.end.dateTime),
+    reminderMinutesBefore,
+    vidaemdiaId: ev.extendedProperties?.private?.vidaemdiaId ?? null,
+  };
+}
+

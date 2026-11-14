@@ -62,6 +62,56 @@ export class GoogleCalendarClient {
     return calendars;
   }
 
+  async listEvents(
+    token: string,
+    calendarId: string,
+    opts: {
+      syncToken?: string;
+      timeMin?: string;
+      timeMax?: string;
+      pageToken?: string;
+    } = {},
+  ): Promise<{ items: any[]; nextPageToken?: string; nextSyncToken?: string }> {
+    const url = new URL(
+      `${this.baseUrl}/calendars/${encodeURIComponent(calendarId)}/events`,
+    );
+    url.searchParams.set('singleEvents', 'true');
+    url.searchParams.set('maxResults', '250');
+
+    if (opts.syncToken) {
+      url.searchParams.set('syncToken', opts.syncToken);
+    } else {
+      if (opts.timeMin) {
+        url.searchParams.set('timeMin', opts.timeMin);
+      }
+      if (opts.timeMax) {
+        url.searchParams.set('timeMax', opts.timeMax);
+      }
+    }
+
+    if (opts.pageToken) {
+      url.searchParams.set('pageToken', opts.pageToken);
+    }
+
+    const res = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) {
+      await this.handleHttpError(res);
+    }
+
+    const data = (await res.json()) as any;
+    return {
+      items: Array.isArray(data?.items) ? data.items : [],
+      nextPageToken: data?.nextPageToken,
+      nextSyncToken: data?.nextSyncToken,
+    };
+  }
+
   async insertEvent(
     token: string,
     calendarId: string,

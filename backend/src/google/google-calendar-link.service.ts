@@ -80,13 +80,18 @@ export class GoogleCalendarLinkService {
 
     const summary = googleCal.summary;
 
+    const updateData = {
+      googleCalendarId,
+      googleCalendarName: summary,
+      googleLinkedAt: new Date(),
+      googleSyncToken: null,
+      googleLastSyncAt: null,
+      googleSyncError: null,
+    };
+
     const updated = await this.prisma.calendar.update({
       where: { id: calendarId },
-      data: {
-        googleCalendarId,
-        googleCalendarName: summary,
-        googleLinkedAt: new Date(),
-      },
+      data: updateData,
     });
 
     await this.auditService.log({
@@ -126,13 +131,18 @@ export class GoogleCalendarLinkService {
       throw new ForbiddenException('Só o dono da agenda pode ligá-la ao Google.');
     }
 
+    const updateData = {
+      googleCalendarId: null,
+      googleCalendarName: null,
+      googleLinkedAt: null,
+      googleSyncToken: null,
+      googleLastSyncAt: null,
+      googleSyncError: null,
+    };
+
     const updated = await this.prisma.calendar.update({
       where: { id: calendarId },
-      data: {
-        googleCalendarId: null,
-        googleCalendarName: null,
-        googleLinkedAt: null,
-      },
+      data: updateData,
     });
 
     await this.auditService.log({

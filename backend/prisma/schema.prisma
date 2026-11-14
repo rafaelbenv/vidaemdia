@@ -71,6 +71,9 @@ model Calendar {
   googleCalendarId   String?   @map("google_calendar_id")
   googleCalendarName String?   @map("google_calendar_name")
   googleLinkedAt     DateTime? @map("google_linked_at")
+  googleSyncToken    String?   @map("google_sync_token")
+  googleLastSyncAt   DateTime? @map("google_last_sync_at")
+  googleSyncError    String?   @map("google_sync_error")
 
   owner        User                 @relation("CalendarOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   permissions  CalendarPermission[]
@@ -113,6 +116,7 @@ model Appointment {
   updatedAt         DateTime          @updatedAt @map("updated_at")
 
   googleEventId   String?           @map("google_event_id")
+  googleEtag      String?           @map("google_etag")
   googleSyncError String?           @map("google_sync_error")
   googleSyncedAt  DateTime?         @map("google_synced_at")
 
@@ -121,6 +125,7 @@ model Appointment {
   reminders      Reminder[]
   googleSyncJobs GoogleSyncJob[]
 
+  @@unique([calendarId, googleEventId])
   @@index([calendarId, startTime, endTime])
   @@map("appointments")
 }

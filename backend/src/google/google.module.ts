@@ -10,6 +10,7 @@ import { GoogleCalendarClient } from './google-calendar.client';
 import { GoogleCalendarLinkService } from './google-calendar-link.service';
 import { GoogleSyncQueueService } from './google-sync-queue.service';
 import { GoogleSyncWorker } from './google-sync.worker';
+import { GooglePullService } from './google-pull.service';
 import { getJwtSecret } from '../config/jwt-secret';
 import { googleConfig } from './google.config';
 
@@ -27,6 +28,7 @@ import { googleConfig } from './google.config';
     GoogleCalendarLinkService,
     GoogleSyncQueueService,
     GoogleSyncWorker,
+    GooglePullService,
   ],
   exports: [
     GoogleOAuthClient,
@@ -34,6 +36,7 @@ import { googleConfig } from './google.config';
     GoogleCalendarClient,
     GoogleCalendarLinkService,
     GoogleSyncQueueService,
+    GooglePullService,
   ],
 })
 export class GoogleModule {

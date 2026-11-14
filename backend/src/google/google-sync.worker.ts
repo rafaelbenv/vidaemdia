@@ -186,6 +186,7 @@ export class GoogleSyncWorker {
       // UPSERT (e o compromisso não está cancelado)
       const eventPayload = toGoogleEvent(appt);
       let eventResultId: string | null = null;
+      let eventResultEtag: string | null = null;
 
       const currentGoogleEventId = (appt as any).googleEventId;
 
@@ -198,6 +199,7 @@ export class GoogleSyncWorker {
             eventPayload,
           );
           eventResultId = patchResult?.id || currentGoogleEventId;
+          eventResultEtag = patchResult?.etag ?? null;
         } catch (err: any) {
           if (
             err instanceof GoogleApiError &&
@@ -209,6 +211,7 @@ export class GoogleSyncWorker {
               eventPayload,
             );
             eventResultId = insertResult?.id;
+            eventResultEtag = insertResult?.etag ?? null;
           } else {
             throw err;
           }
@@ -220,12 +223,14 @@ export class GoogleSyncWorker {
           eventPayload,
         );
         eventResultId = insertResult?.id;
+        eventResultEtag = insertResult?.etag ?? null;
       }
 
       await (this.prisma as any).appointment.update({
         where: { id: appt.id },
         data: {
           googleEventId: eventResultId,
+          googleEtag: eventResultEtag,
           googleSyncedAt: new Date(),
           googleSyncError: null,
         },
