@@ -148,6 +148,9 @@ describe('GoogleCalendarLinkService', () => {
           googleCalendarId: 'g-cal-1',
           googleCalendarName: 'Trabalho Google',
           googleLinkedAt: expect.any(Date),
+          googleSyncToken: null,
+          googleLastSyncAt: null,
+          googleSyncError: null,
         },
       });
 
@@ -259,6 +262,9 @@ describe('GoogleCalendarLinkService', () => {
           googleCalendarId: null,
           googleCalendarName: null,
           googleLinkedAt: null,
+          googleSyncToken: null,
+          googleLastSyncAt: null,
+          googleSyncError: null,
         },
       });
 

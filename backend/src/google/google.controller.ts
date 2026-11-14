@@ -5,6 +5,7 @@ import {
   Get,
   Logger,
   Param,
+  Post,
   Put,
   Query,
   Req,
@@ -24,6 +25,7 @@ import { IsNotEmpty, IsString } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GoogleAccountService } from './google-account.service';
 import { GoogleCalendarLinkService } from './google-calendar-link.service';
+import { GooglePullService } from './google-pull.service';
 import { googleConfig } from './google.config';
 
 export class LinkGoogleCalendarDto {
@@ -168,6 +170,7 @@ export class GoogleController {
 export class GoogleAgendaLinkController {
   constructor(
     private readonly linkService: GoogleCalendarLinkService,
+    private readonly pullService: GooglePullService,
   ) {}
 
   @Put(':id/google')
@@ -215,5 +218,40 @@ export class GoogleAgendaLinkController {
     }
     const userId = req.user?.id || req.user?.sub;
     return this.linkService.unlink(userId, calendarId);
+  }
+
+  @Post(':id/google/sincronizar')
+  @ApiOperation({
+    summary: 'Sincroniza imediatamente os eventos da agenda com o Google Agenda',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Sincronização concluída com sucesso',
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'Integração com o Google Agenda não configurada',
+  })
+  @ApiResponse({ status: 404, description: 'Agenda não encontrada' })
+  @ApiResponse({
+    status: 403,
+    description: 'Só o dono da agenda pode sincronizá-la',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Agenda não está ligada ao Google Agenda',
+  })
+  async syncNow(
+    @Param('id') calendarId: string,
+    @Req() req: any,
+  ) {
+    const cfg = googleConfig();
+    if (!cfg.configured) {
+      throw new ServiceUnavailableException(
+        'Integração com o Google Agenda não configurada',
+      );
+    }
+    const userId = req.user?.id || req.user?.sub;
+    return this.pullService.pullCalendarForOwner(userId, calendarId);
   }
 }

@@ -80,8 +80,12 @@ describe('GoogleSyncWorker', () => {
     };
 
     mockCalendarClient = {
-      insertEvent: jest.fn().mockResolvedValue({ id: 'g-event-new' }),
-      patchEvent: jest.fn().mockResolvedValue({ id: 'g-event-patched' }),
+      insertEvent: jest
+        .fn()
+        .mockResolvedValue({ id: 'g-event-new', etag: '"etag-new"' }),
+      patchEvent: jest
+        .fn()
+        .mockResolvedValue({ id: 'g-event-patched', etag: '"etag-patched"' }),
       deleteEvent: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -150,6 +154,7 @@ describe('GoogleSyncWorker', () => {
       where: { id: 'appt-1' },
       data: {
         googleEventId: 'g-event-new',
+        googleEtag: '"etag-new"',
         googleSyncedAt: expect.any(Date),
         googleSyncError: null,
       },
@@ -188,6 +193,7 @@ describe('GoogleSyncWorker', () => {
       where: { id: 'appt-1' },
       data: {
         googleEventId: 'g-event-patched',
+        googleEtag: '"etag-patched"',
         googleSyncedAt: expect.any(Date),
         googleSyncError: null,
       },
@@ -205,7 +211,10 @@ describe('GoogleSyncWorker', () => {
     mockCalendarClient.patchEvent.mockRejectedValue(
       new GoogleApiError(404, 'Not Found'),
     );
-    mockCalendarClient.insertEvent.mockResolvedValue({ id: 'g-event-recreated' });
+    mockCalendarClient.insertEvent.mockResolvedValue({
+      id: 'g-event-recreated',
+      etag: '"etag-recreated"',
+    });
 
     await worker.processQueue();
 
@@ -215,6 +224,7 @@ describe('GoogleSyncWorker', () => {
       where: { id: 'appt-1' },
       data: {
         googleEventId: 'g-event-recreated',
+        googleEtag: '"etag-recreated"',
         googleSyncedAt: expect.any(Date),
         googleSyncError: null,
       },
@@ -231,7 +241,10 @@ describe('GoogleSyncWorker', () => {
     mockCalendarClient.patchEvent.mockRejectedValue(
       new GoogleApiError(410, 'Gone'),
     );
-    mockCalendarClient.insertEvent.mockResolvedValue({ id: 'g-event-new-410' });
+    mockCalendarClient.insertEvent.mockResolvedValue({
+      id: 'g-event-new-410',
+      etag: '"etag-410"',
+    });
 
     await worker.processQueue();
 
@@ -241,6 +254,7 @@ describe('GoogleSyncWorker', () => {
       where: { id: 'appt-1' },
       data: {
         googleEventId: 'g-event-new-410',
+        googleEtag: '"etag-410"',
         googleSyncedAt: expect.any(Date),
         googleSyncError: null,
       },
