@@ -393,6 +393,15 @@ export function installMockApi(seed?: MockApiSeed) {
       return jsonResponse({ ok: true, message: 'Senha alterada.' });
     }
 
+    // DELETE /auth/me
+    if (route === '/auth/me' && method === 'DELETE') {
+      if (body?.password !== '123456') {
+        return jsonResponse({ message: 'Senha incorreta.' }, 400);
+      }
+      currentUsers = currentUsers.filter((u) => u.id !== currentUser.id);
+      return jsonResponse({ ok: true, message: 'Conta excluída.' });
+    }
+
     // GET /agendas
     if (route === '/agendas' && method === 'GET') {
       const owned = currentCalendars

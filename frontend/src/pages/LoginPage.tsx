@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Loader2, AlertTriangle } from 'lucide-react';
+import { Calendar, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { SHOW_DEMO_ACCOUNTS } from '../lib/routes';
 
 export interface LoginPageProps {
@@ -13,6 +13,7 @@ export interface LoginPageProps {
   onGoToRegister?: () => void;
   onForgotPassword?: () => void;
   showDemoAccounts?: boolean;
+  notice?: string | null;
 }
 
 const DEMO_ACCOUNTS = [
@@ -32,6 +33,7 @@ export function LoginPage({
   onGoToRegister,
   onForgotPassword,
   showDemoAccounts = SHOW_DEMO_ACCOUNTS,
+  notice,
 }: LoginPageProps) {
   return (
     <div className="min-h-screen bg-stone-50 flex items-center justify-center p-4">
@@ -48,6 +50,16 @@ export function LoginPage({
         {/* Card com o formulário */}
         <div className="bg-white rounded-lg border border-stone-200 p-6 mt-6">
           <form onSubmit={(e) => onLogin(e)} noValidate className="space-y-4">
+            {notice && (
+              <div
+                role="status"
+                className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2 flex items-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                <span>{notice}</span>
+              </div>
+            )}
+
             {authError && (
               <div
                 role="alert"

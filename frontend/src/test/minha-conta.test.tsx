@@ -101,4 +101,53 @@ describe('Minha Conta', () => {
 
     expect(await screen.findByRole('button', { name: /\+ novo compromisso/i })).toBeInTheDocument();
   });
+
+  it('ao clicar em Cancelar, esconde o campo de confirmação de senha de exclusão', async () => {
+    const { user } = renderApp({ path: '/conta', token: 'token-carlos' });
+
+    const openDeleteBtn = await screen.findByRole('button', { name: /^excluir minha conta$/i });
+    await user.click(openDeleteBtn);
+
+    expect(await screen.findByLabelText(/confirme com a sua senha/i)).toBeInTheDocument();
+
+    const cancelBtn = screen.getByRole('button', { name: /^cancelar$/i });
+    await user.click(cancelBtn);
+
+    expect(screen.queryByLabelText(/confirme com a sua senha/i)).not.toBeInTheDocument();
+  });
+
+  it('excluir conta com senha errada mostra "Senha incorreta."', async () => {
+    const { user } = renderApp({ path: '/conta', token: 'token-carlos' });
+
+    const openDeleteBtn = await screen.findByRole('button', { name: /^excluir minha conta$/i });
+    await user.click(openDeleteBtn);
+
+    const pwdInput = await screen.findByLabelText(/confirme com a sua senha/i);
+    await user.type(pwdInput, 'senha-errada');
+
+    const confirmBtn = screen.getByRole('button', { name: /^excluir definitivamente$/i });
+    await user.click(confirmBtn);
+
+    expect(await screen.findByText('Senha incorreta.')).toBeInTheDocument();
+  });
+
+  it('excluir conta com senha certa volta à tela de login com "Sua conta foi excluída."', async () => {
+    const { user } = renderApp({ path: '/conta', token: 'token-carlos' });
+
+    const openDeleteBtn = await screen.findByRole('button', { name: /^excluir minha conta$/i });
+    await user.click(openDeleteBtn);
+
+    const pwdInput = await screen.findByLabelText(/confirme com a sua senha/i);
+    await user.type(pwdInput, '123456');
+
+    const confirmBtn = screen.getByRole('button', { name: /^excluir definitivamente$/i });
+    await user.click(confirmBtn);
+
+    expect(await screen.findByText('Sua conta foi excluída.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^entrar$/i })).toBeInTheDocument();
+
+    const deleteCalls = calls().filter((c) => c.method === 'DELETE' && c.path.includes('/auth/me'));
+    expect(deleteCalls).toHaveLength(1);
+    expect(deleteCalls[0].body).toEqual({ password: '123456' });
+  });
 });

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Patch,
@@ -12,8 +13,10 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { PasswordResetService } from './password-reset.service';
+import { AccountDeletionService } from './account-deletion.service';
 import {
   ChangePasswordDto,
+  DeleteAccountDto,
   ForgotPasswordDto,
   LoginDto,
   RegisterDto,
@@ -28,6 +31,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly passwordResetService: PasswordResetService,
+    private readonly accountDeletionService: AccountDeletionService,
   ) {}
 
   @Post('login')
@@ -70,6 +74,16 @@ export class AuthController {
   @ApiOperation({ summary: 'Troca a senha do usuário autenticado (exige a senha atual)' })
   async changePassword(@Body() dto: ChangePasswordDto, @Req() req: any) {
     return this.authService.changePassword(req.user.sub, dto, req.ip);
+  }
+
+  @Delete('me')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Exclui a conta do usuário autenticado (exige a senha)' })
+  async deleteAccount(@Body() dto: DeleteAccountDto, @Req() req: any) {
+    return this.accountDeletionService.deleteAccount(req.user.sub, dto, req.ip);
   }
 
   @Post('senha/esqueci')

@@ -344,5 +344,20 @@ export async function resetPassword(
   });
 }
 
+export async function deleteAccount(
+  token: string,
+  password: string,
+): Promise<{ ok: boolean; message: string }> {
+  return apiRequest<{ ok: boolean; message: string }>(
+    '/auth/me',
+    {
+      method: 'DELETE',
+      body: JSON.stringify({ password }),
+    },
+    token,
+  );
+}
+
+
 
 

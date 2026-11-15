@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 import { GoogleStatus, User } from '../types';
-import { changePassword, errorMessage, updateProfile } from '../api';
+import { changePassword, deleteAccount, errorMessage, updateProfile } from '../api';
 
 export interface MinhaContaPageProps {
   user: User;
@@ -16,6 +16,7 @@ export interface MinhaContaPageProps {
   googleStatus?: GoogleStatus | null;
   onConnectGoogle?: () => void | Promise<void>;
   onDisconnectGoogle?: () => void;
+  onAccountDeleted?: () => void;
 }
 
 export function MinhaContaPage({
@@ -31,6 +32,7 @@ export function MinhaContaPage({
   googleStatus,
   onConnectGoogle,
   onDisconnectGoogle,
+  onAccountDeleted,
 }: MinhaContaPageProps) {
   // Estado Dados
   const [name, setName] = useState(user.name);
@@ -49,6 +51,12 @@ export function MinhaContaPage({
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  // Estado Excluir Conta
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function handleSaveName(e: React.FormEvent) {
     e.preventDefault();
@@ -104,6 +112,26 @@ export function MinhaContaPage({
       setPasswordError(errorMessage(err, 'Não foi possível alterar a senha.'));
     } finally {
       setPasswordLoading(false);
+    }
+  }
+
+  async function handleDeleteAccount(e: React.FormEvent) {
+    e.preventDefault();
+    setDeleteError(null);
+
+    if (!deletePassword) {
+      setDeleteError('Informe a sua senha para confirmar.');
+      return;
+    }
+
+    try {
+      setDeleteLoading(true);
+      await deleteAccount(token, deletePassword);
+      onAccountDeleted?.();
+    } catch (err: unknown) {
+      setDeleteError(errorMessage(err, 'Não foi possível excluir a conta.'));
+    } finally {
+      setDeleteLoading(false);
     }
   }
 
@@ -361,6 +389,91 @@ export function MinhaContaPage({
             </div>
           )}
         </div>
+      </section>
+
+      {/* Card 4: Excluir conta */}
+      <section className="bg-white rounded-lg border border-red-200 p-5">
+        <h2 className="text-lg font-semibold text-stone-900 mb-2">Excluir conta</h2>
+        <p className="text-sm text-stone-600 mb-4">
+          Apaga a sua conta, as suas agendas, compromissos e lembretes. Não dá para desfazer. Os eventos já enviados ao seu Google Agenda continuam lá.
+        </p>
+
+        {showDeleteConfirm ? (
+          <form onSubmit={handleDeleteAccount} noValidate className="space-y-4">
+            {deleteError && (
+              <div
+                role="alert"
+                className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2 flex items-center gap-2"
+              >
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            <div>
+              <label
+                htmlFor="conta-excluir-senha"
+                className="block text-sm font-medium text-stone-700 mb-1"
+              >
+                Confirme com a sua senha
+              </label>
+              <input
+                id="conta-excluir-senha"
+                type="password"
+                autoComplete="current-password"
+                value={deletePassword}
+                onChange={(e) => {
+                  setDeletePassword(e.target.value);
+                  if (deleteError) setDeleteError(null);
+                }}
+                className="w-full px-3.5 py-2 text-base border border-stone-300 rounded-md focus:ring-2 focus:ring-brand-700 focus:outline-none"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="submit"
+                disabled={deleteLoading}
+                className="py-2 px-4 bg-red-600 hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold text-sm rounded-md transition inline-flex items-center justify-center gap-2"
+              >
+                {deleteLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Excluindo…</span>
+                  </>
+                ) : (
+                  <span>Excluir definitivamente</span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setDeletePassword('');
+                  setDeleteError(null);
+                }}
+                disabled={deleteLoading}
+                className="py-2 px-4 text-stone-600 hover:text-stone-900 font-semibold text-sm rounded-md transition inline-flex items-center justify-center"
+              >
+                Cancelar
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowDeleteConfirm(true);
+                setDeleteError(null);
+                setDeletePassword('');
+              }}
+              className="py-2 px-4 text-red-600 hover:bg-red-50 border border-red-200 font-semibold text-sm rounded-md transition inline-flex items-center justify-center gap-2"
+            >
+              Excluir minha conta
+            </button>
+          </div>
+        )}
       </section>
     </div>
   );

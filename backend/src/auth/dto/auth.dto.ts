@@ -108,3 +108,11 @@ export class ResetPasswordDto {
   newPassword: string;
 }
 
+export class DeleteAccountDto {
+  @ApiProperty({ example: '123456' })
+  @IsString()
+  @IsNotEmpty({ message: 'Informe a sua senha para confirmar' })
+  password: string;
+}
+
+

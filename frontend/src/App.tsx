@@ -247,6 +247,7 @@ export function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
+  const [loginNotice, setLoginNotice] = useState<string | null>(null);
   const [initialLoadError, setInitialLoadError] = useState<string | null>(null);
 
   // Appointments, Professionals & Audit State
@@ -516,6 +517,7 @@ export function App() {
   async function handleLogin(e?: React.FormEvent, demo?: { email: string; password: string }) {
     if (e) e.preventDefault();
     setAuthError(null);
+    setLoginNotice(null);
 
     const loginEmail = demo ? demo.email : email;
     const loginPassword = demo ? demo.password : password;
@@ -568,8 +570,14 @@ export function App() {
     setInitialLoadError(null);
     setSelectedCalendarId('');
     setAppointments([]);
+    setLoginNotice(null);
     navigate(LOGIN_PATH, { replace: true });
     setUserMenuOpen(false);
+  }
+
+  function handleAccountDeleted() {
+    handleLogout();
+    setLoginNotice('Sua conta foi excluída.');
   }
 
   useEffect(() => {
@@ -1099,8 +1107,15 @@ export function App() {
         authError={authError}
         loading={loading}
         onLogin={handleLogin}
-        onGoToRegister={() => navigate(CRIAR_CONTA_PATH)}
-        onForgotPassword={() => navigate(ESQUECI_SENHA_PATH)}
+        onGoToRegister={() => {
+          setLoginNotice(null);
+          navigate(CRIAR_CONTA_PATH);
+        }}
+        onForgotPassword={() => {
+          setLoginNotice(null);
+          navigate(ESQUECI_SENHA_PATH);
+        }}
+        notice={loginNotice}
       />
     );
   }
@@ -1291,6 +1306,7 @@ export function App() {
             googleStatus={googleStatus}
             onConnectGoogle={handleConnectGoogle}
             onDisconnectGoogle={openDisconnectGoogleDialog}
+            onAccountDeleted={handleAccountDeleted}
           />
         ) : rawPath === COMPARTILHAR_PATH && canShareSelected && activeCalendar ? (
           <CompartilharPage
