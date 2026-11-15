@@ -6,19 +6,22 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { MonitoringModule } from '../monitoring/monitoring.module';
 import { getJwtSecret } from '../config/jwt-secret';
+import { TelegramModule } from '../telegram/telegram.module';
+import { PasswordResetService } from './password-reset.service';
 
 @Module({
   imports: [
     PassportModule,
     MonitoringModule,
+    TelegramModule,
     JwtModule.register({
       secret: getJwtSecret(),
       signOptions: { expiresIn: (process.env.JWT_EXPIRES_IN || '8h') as any },
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
-  exports: [AuthService],
+  providers: [AuthService, JwtStrategy, PasswordResetService],
+  exports: [AuthService, PasswordResetService],
 })
 export class AuthModule {}
 

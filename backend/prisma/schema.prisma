@@ -53,6 +53,7 @@ model User {
   createdAppointments Appointment[]        @relation("AppointmentCreator")
   auditLogs           AuditLog[]           @relation("AuditActor")
   telegramLinkTokens  TelegramLinkToken[]
+  passwordResetCodes  PasswordResetCode[]
   googleAccount       GoogleAccount?
 
   @@map("users")
@@ -186,6 +187,21 @@ model TelegramLinkToken {
 
   @@index([userId])
   @@map("telegram_link_tokens")
+}
+
+model PasswordResetCode {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  codeHash  String    @map("code_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_codes")
 }
 
 model GoogleAccount {

@@ -81,3 +81,30 @@ export class ChangePasswordDto {
   @NewPasswordRules()
   newPassword: string;
 }
+
+export class ForgotPasswordDto {
+  @ApiProperty({ example: 'carlos@vidaemdia.com.br' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @IsEmail({}, { message: 'Informe um e-mail válido' })
+  @MaxLength(254)
+  email: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty({ example: 'carlos@vidaemdia.com.br' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @IsEmail({}, { message: 'Informe um e-mail válido' })
+  @MaxLength(254)
+  email: string;
+
+  @ApiProperty({ example: '123456' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.replace(/\s+/g, '') : value))
+  @IsString()
+  @Matches(/^\d{6}$/, { message: 'O código tem 6 números' })
+  code: string;
+
+  @ApiProperty({ example: 'senhaForte1' })
+  @NewPasswordRules()
+  newPassword: string;
+}
+
