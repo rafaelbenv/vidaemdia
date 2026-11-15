@@ -101,6 +101,17 @@ export async function login(
   });
 }
 
+export async function register(
+  name: string,
+  email: string,
+  password: string,
+): Promise<{ accessToken: string; user: User }> {
+  return apiRequest<{ accessToken: string; user: User }>('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ name, email, password }),
+  });
+}
+
 export async function getMe(token: string): Promise<User> {
   return apiRequest<User>('/auth/me', {}, token);
 }

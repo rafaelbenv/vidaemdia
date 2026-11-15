@@ -1,5 +1,6 @@
 import React from 'react';
 import { Calendar, Loader2, AlertTriangle } from 'lucide-react';
+import { SHOW_DEMO_ACCOUNTS } from '../lib/routes';
 
 export interface LoginPageProps {
   email: string;
@@ -9,6 +10,8 @@ export interface LoginPageProps {
   authError: string | null;
   loading: boolean;
   onLogin: (e?: React.FormEvent, demo?: { email: string; password: string }) => Promise<void>;
+  onGoToRegister?: () => void;
+  showDemoAccounts?: boolean;
 }
 
 const DEMO_ACCOUNTS = [
@@ -25,6 +28,8 @@ export function LoginPage({
   authError,
   loading,
   onLogin,
+  onGoToRegister,
+  showDemoAccounts = SHOW_DEMO_ACCOUNTS,
 }: LoginPageProps) {
   return (
     <div className="min-h-screen bg-stone-50 flex items-center justify-center p-4">
@@ -96,28 +101,43 @@ export function LoginPage({
           </form>
         </div>
 
-        {/* Contas de demonstração */}
-        <details className="mt-4 text-stone-700">
-          <summary className="text-sm font-medium text-stone-600 hover:text-stone-900 cursor-pointer select-none text-center">
-            Entrar com uma conta de demonstração
-          </summary>
-          <div className="mt-3 space-y-2">
-            {DEMO_ACCOUNTS.map((acc) => (
-              <button
-                key={acc.email}
-                type="button"
-                disabled={loading}
-                onClick={() => onLogin(undefined, { email: acc.email, password: '123456' })}
-                className="w-full text-left px-3.5 py-2.5 rounded-md border border-stone-200 bg-white hover:bg-stone-50 hover:border-stone-300 transition text-sm font-medium text-stone-800 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {acc.name}
-              </button>
-            ))}
-            <p className="text-xs text-stone-500 text-center pt-1">
-              Contas de exemplo para testar o sistema. Senha de todas: 123456
-            </p>
+        {onGoToRegister && (
+          <div className="text-center mt-4 text-sm text-stone-600">
+            <span>Ainda não tem conta? </span>
+            <button
+              type="button"
+              onClick={onGoToRegister}
+              className="text-brand-700 font-semibold hover:underline"
+            >
+              Criar conta
+            </button>
           </div>
-        </details>
+        )}
+
+        {/* Contas de demonstração */}
+        {showDemoAccounts && (
+          <details className="mt-4 text-stone-700">
+            <summary className="text-sm font-medium text-stone-600 hover:text-stone-900 cursor-pointer select-none text-center">
+              Entrar com uma conta de demonstração
+            </summary>
+            <div className="mt-3 space-y-2">
+              {DEMO_ACCOUNTS.map((acc) => (
+                <button
+                  key={acc.email}
+                  type="button"
+                  disabled={loading}
+                  onClick={() => onLogin(undefined, { email: acc.email, password: '123456' })}
+                  className="w-full text-left px-3.5 py-2.5 rounded-md border border-stone-200 bg-white hover:bg-stone-50 hover:border-stone-300 transition text-sm font-medium text-stone-800 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {acc.name}
+                </button>
+              ))}
+              <p className="text-xs text-stone-500 text-center pt-1">
+                Contas de exemplo para testar o sistema. Senha de todas: 123456
+              </p>
+            </div>
+          </details>
+        )}
       </div>
     </div>
   );

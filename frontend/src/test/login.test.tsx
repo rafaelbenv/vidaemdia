@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { installMockApi, calls } from './mockApi';
 import { renderApp } from './renderApp';
+import { LoginPage } from '../pages/LoginPage';
 
 describe('Login', () => {
   beforeEach(() => {
@@ -63,5 +64,22 @@ describe('Login', () => {
     expect(
       await screen.findByRole('button', { name: /\+ novo compromisso/i }),
     ).toBeInTheDocument();
+  });
+
+  it('com showDemoAccounts=false não mostra o bloco de contas de demonstração', () => {
+    render(
+      <LoginPage
+        email=""
+        setEmail={() => {}}
+        password=""
+        setPassword={() => {}}
+        authError={null}
+        loading={false}
+        onLogin={async () => {}}
+        showDemoAccounts={false}
+      />,
+    );
+
+    expect(screen.queryByText('Entrar com uma conta de demonstração')).not.toBeInTheDocument();
   });
 });

@@ -287,6 +287,10 @@ A estrutura do banco de dados PostgreSQL é versionada através do Prisma em `ba
 | `PROFESSIONAL` | Dra. Ana Costa | `dra.ana@vidaemdia.com.br` | Possui Agenda Profissional **restrita** (retorna **403 Acesso Negado** se a Secretária Maria tentar acessar). |
 | `SECRETARY` | Maria Oliveira | `secretaria.maria@vidaemdia.com.br` | Acessa e gerencia a agenda do Dr. João (`200 OK`) e é bloqueada na agenda da Dra. Ana (`403 Forbidden`). |
 
+> Os botões das contas de demonstração na tela de login só aparecem com `VITE_SHOW_DEMO_ACCOUNTS=true` no `.env` (e rebuild do front: `docker compose up -d --build frontend`).
+>
+> Qualquer pessoa pode criar uma conta pessoal em `/criar-conta` (link "Criar conta" na tela de login).
+>
 > Contas criadas pelo cadastro (`POST /auth/register`) são de uso pessoal (papel `USER`), recebem a agenda "Minha agenda" e exigem senha de 8 a 72 caracteres com pelo menos uma letra e um número; as contas do seed mantêm a senha `123456`.
 
 ---

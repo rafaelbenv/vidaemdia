@@ -292,6 +292,48 @@ export function installMockApi(seed?: MockApiSeed) {
       return jsonResponse({ message: 'E-mail ou senha incorretos' }, 401);
     }
 
+    // POST /auth/register
+    if (route === '/auth/register' && method === 'POST') {
+      const email = body?.email?.trim();
+      const name = body?.name?.trim();
+      const existing = currentUsers.find(
+        (u) => u.email.toLowerCase() === (email || '').toLowerCase(),
+      );
+      if (existing) {
+        return jsonResponse(
+          {
+            message:
+              'Não foi possível criar a conta com este e-mail. Se você já tem conta, entre ou recupere a senha.',
+          },
+          400,
+        );
+      }
+      const newUserId = `user-${nextId++}`;
+      const newUser: User = {
+        id: newUserId,
+        name: name || 'Novo Usuário',
+        email: email || '',
+        role: 'USER',
+        telegramChatId: null as unknown as undefined,
+        telegramLinked: false,
+        preferredChannel: 'TELEGRAM',
+      };
+      currentUsers.push(newUser);
+      const newCalendar: Calendar = {
+        id: `cal-${nextId++}`,
+        ownerId: newUser.id,
+        type: 'PERSONAL',
+        name: 'Minha agenda',
+        description: 'Agenda pessoal',
+        color: '#2563EB',
+        owner: newUser,
+        permissions: [],
+        _count: { appointments: 0 },
+      };
+      currentCalendars.push(newCalendar);
+      return jsonResponse({ accessToken: `token-${newUser.id}`, user: newUser });
+    }
+
     // Token check for all other routes
     const authHeader = getAuthHeader(init);
     const currentUser = resolveUserFromToken(authHeader);

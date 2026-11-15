@@ -19,6 +19,7 @@ import {
   getTelegramStatus,
   grantPermission,
   login,
+  register,
   revokePermission,
   runWorkerNow,
   setUnauthorizedHandler,
@@ -55,6 +56,7 @@ import { formatRemindSuffix } from './lib/reminderText';
 import {
   AGENDA_PATH,
   COMPARTILHAR_PATH,
+  CRIAR_CONTA_PATH,
   HISTORICO_PATH,
   LOGIN_PATH,
   SHOW_BASTIDORES,
@@ -74,6 +76,7 @@ import { SessionLoadError } from './components/SessionLoadError';
 import { BastidoresLayout } from './components/BastidoresLayout';
 import { AppointmentFormValues, AppointmentPanel } from './components/agenda/AppointmentPanel';
 import { LoginPage } from './pages/LoginPage';
+import { CriarContaPage } from './pages/CriarContaPage';
 import { AgendaPage } from './pages/AgendaPage';
 import { CompartilharPage } from './pages/CompartilharPage';
 import { HistoricoPage } from './pages/HistoricoPage';
@@ -160,7 +163,9 @@ export function App() {
   useEffect(() => {
     const path = location.pathname.replace(/\/+$/, '') || '/';
     if (!token) {
-      if (path !== LOGIN_PATH) navigate(LOGIN_PATH, { replace: true });
+      if (path !== LOGIN_PATH && path !== CRIAR_CONTA_PATH) {
+        navigate(LOGIN_PATH, { replace: true });
+      }
       return;
     }
     if (!user) return; // sessão ainda sendo validada: não mexe na URL (recarregar mantém a tela)
@@ -489,6 +494,19 @@ export function App() {
     }
   }
 
+  function startSession(res: { accessToken: string; user: User }, welcomeTitle: string) {
+    localStorage.setItem('vidaemdia_jwt', res.accessToken);
+    setSelectedCalendarId('');
+    setToken(res.accessToken);
+    setUser(res.user);
+    navigate(AGENDA_PATH);
+    setUserMenuOpen(false);
+    setFeedbackBanner({
+      type: 'success',
+      title: welcomeTitle,
+    });
+  }
+
   async function handleLogin(e?: React.FormEvent, demo?: { email: string; password: string }) {
     if (e) e.preventDefault();
     setAuthError(null);
@@ -504,18 +522,22 @@ export function App() {
     try {
       setLoading(true);
       const res = await login(loginEmail.trim(), loginPassword);
-      localStorage.setItem('vidaemdia_jwt', res.accessToken);
-      setSelectedCalendarId('');
-      setToken(res.accessToken);
-      setUser(res.user);
-      navigate(AGENDA_PATH);
-      setUserMenuOpen(false);
-      setFeedbackBanner({
-        type: 'success',
-        title: `Olá, ${firstName(res.user.name)}!`,
-      });
+      startSession(res, `Olá, ${firstName(res.user.name)}!`);
     } catch (err: unknown) {
       setAuthError(errorMessage(err, 'Falha na autenticação'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRegister(name: string, email: string, password: string): Promise<string | null> {
+    try {
+      setLoading(true);
+      const res = await register(name, email, password);
+      startSession(res, `Conta criada. Bem-vindo(a), ${firstName(res.user.name)}!`);
+      return null;
+    } catch (err: unknown) {
+      return errorMessage(err, 'Não foi possível criar a conta');
     } finally {
       setLoading(false);
     }
@@ -1039,9 +1061,18 @@ export function App() {
   }
 
   // ==========================================
-  // TELA DE LOGIN (Fluxo Principal - Etapa 1 e 2)
+  // TELA DE LOGIN / CRIAR CONTA (Fluxo Principal - Etapa 1 e 2)
   // ==========================================
   if (!token) {
+    if (rawPath === CRIAR_CONTA_PATH) {
+      return (
+        <CriarContaPage
+          loading={loading}
+          onRegister={handleRegister}
+          onGoToLogin={() => navigate(LOGIN_PATH)}
+        />
+      );
+    }
     return (
       <LoginPage
         email={email}
@@ -1051,6 +1082,7 @@ export function App() {
         authError={authError}
         loading={loading}
         onLogin={handleLogin}
+        onGoToRegister={() => navigate(CRIAR_CONTA_PATH)}
       />
     );
   }

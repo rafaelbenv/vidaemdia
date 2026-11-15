@@ -11,5 +11,6 @@ export default defineConfig({
     pool: 'forks',
     css: false,
     restoreMocks: true,
+    env: { VITE_SHOW_DEMO_ACCOUNTS: 'true' },
   },
 });
