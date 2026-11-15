@@ -292,6 +292,8 @@ A estrutura do banco de dados PostgreSQL é versionada através do Prisma em `ba
 > Qualquer pessoa pode criar uma conta pessoal em `/criar-conta` (link "Criar conta" na tela de login). Na primeira entrada, a conta nova vê o cartão "Primeiros passos" (Telegram, primeiro compromisso e, se configurado, Google Agenda), que pode ser dispensado.
 >
 > Contas criadas pelo cadastro (`POST /auth/register`) são de uso pessoal (papel `USER`), recebem a agenda "Minha agenda" e exigem senha de 8 a 72 caracteres com pelo menos uma letra e um número; as contas do seed mantêm a senha `123456`.
+>
+> Em **Minha conta** (menu do usuário, `/conta`) a pessoa muda o nome, troca a senha (pedindo a atual) e vê ou desfaz as conexões com o Telegram e o Google; rotas `PATCH /auth/me` e `POST /auth/me/senha` (limite de 5 trocas de senha por minuto), as duas registradas na auditoria.
 
 ---
 

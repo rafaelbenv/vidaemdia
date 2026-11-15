@@ -346,6 +346,22 @@ export function installMockApi(seed?: MockApiSeed) {
       return jsonResponse(currentUser);
     }
 
+    // PATCH /auth/me
+    if (route === '/auth/me' && method === 'PATCH') {
+      if (body?.name !== undefined) {
+        currentUser.name = String(body.name).trim();
+      }
+      return jsonResponse(currentUser);
+    }
+
+    // POST /auth/me/senha
+    if (route === '/auth/me/senha' && method === 'POST') {
+      if (body?.currentPassword !== '123456') {
+        return jsonResponse({ message: 'A senha atual está incorreta.' }, 400);
+      }
+      return jsonResponse({ ok: true, message: 'Senha alterada.' });
+    }
+
     // GET /agendas
     if (route === '/agendas' && method === 'GET') {
       const owned = currentCalendars

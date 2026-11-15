@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown, LogOut, Wrench } from 'lucide-react';
+import { ChevronDown, LogOut, UserRound, Wrench } from 'lucide-react';
 import { GoogleStatus, User } from '../types';
 import { firstName, roleLabel } from '../lib/format';
 
@@ -17,6 +17,7 @@ export interface UserMenuProps {
   openLogoutDialog: () => void;
   showBastidores: boolean;
   onOpenBastidores: () => void;
+  onOpenAccount: () => void;
   googleStatus?: GoogleStatus | null;
   handleConnectGoogle?: () => void | Promise<void>;
   openDisconnectGoogleDialog?: () => void;
@@ -36,6 +37,7 @@ export function UserMenu({
   openLogoutDialog,
   showBastidores,
   onOpenBastidores,
+  onOpenAccount,
   googleStatus,
   handleConnectGoogle,
   openDisconnectGoogleDialog,
@@ -175,6 +177,21 @@ export function UserMenu({
               )}
             </div>
           )}
+
+          {/* Minha conta */}
+          <div className="px-2 py-1.5 border-b border-stone-100">
+            <button
+              type="button"
+              onClick={() => {
+                setUserMenuOpen(false);
+                onOpenAccount();
+              }}
+              className="w-full text-left px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-100 rounded transition flex items-center gap-2 min-h-11 min-w-11 sm:min-h-[40px] sm:min-w-0"
+            >
+              <UserRound className="w-3.5 h-3.5 text-stone-500" />
+              Minha conta
+            </button>
+          </div>
 
           {/* Bastidores (área técnica) */}
           {showBastidores && (

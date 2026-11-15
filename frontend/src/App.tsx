@@ -60,6 +60,7 @@ import {
   CRIAR_CONTA_PATH,
   HISTORICO_PATH,
   LOGIN_PATH,
+  MINHA_CONTA_PATH,
   SHOW_BASTIDORES,
   bastidoresPath,
   sectionFromPath,
@@ -80,6 +81,7 @@ import { LoginPage } from './pages/LoginPage';
 import { CriarContaPage } from './pages/CriarContaPage';
 import { AgendaPage } from './pages/AgendaPage';
 import { CompartilharPage } from './pages/CompartilharPage';
+import { MinhaContaPage } from './pages/MinhaContaPage';
 import { HistoricoPage } from './pages/HistoricoPage';
 import { TesteAcessoPage } from './pages/TesteAcessoPage';
 import { LembretesPage } from './pages/LembretesPage';
@@ -179,6 +181,7 @@ export function App() {
     const currentSection = sectionFromPath(path);
     const isBastidoresValid = currentSection !== null && SHOW_BASTIDORES;
     const isAgenda = path === AGENDA_PATH;
+    const isMinhaConta = path === MINHA_CONTA_PATH;
 
     if (path === COMPARTILHAR_PATH || path === HISTORICO_PATH) {
       if (loading || allAccessibleCalendars.length === 0) {
@@ -191,7 +194,7 @@ export function App() {
       return;
     }
 
-    if (!isBastidoresValid && !isAgenda) {
+    if (!isBastidoresValid && !isAgenda && !isMinhaConta) {
       navigate(AGENDA_PATH, { replace: true });
     }
   }, [token, user, canShareSelected, loading, allAccessibleCalendars.length, location.pathname, navigate]);
@@ -1244,6 +1247,7 @@ export function App() {
             openLogoutDialog={openLogoutDialog}
             showBastidores={SHOW_BASTIDORES}
             onOpenBastidores={() => navigate(bastidoresPath('lembretes'))}
+            onOpenAccount={() => navigate(MINHA_CONTA_PATH)}
             googleStatus={googleStatus}
             handleConnectGoogle={handleConnectGoogle}
             openDisconnectGoogleDialog={openDisconnectGoogleDialog}
@@ -1260,7 +1264,22 @@ export function App() {
 
       {/* Conteúdo Principal */}
       <main className="max-w-7xl mx-auto w-full px-4 py-6 flex-1">
-        {rawPath === COMPARTILHAR_PATH && canShareSelected && activeCalendar ? (
+        {rawPath === MINHA_CONTA_PATH ? (
+          <MinhaContaPage
+            user={user}
+            token={token}
+            onUserUpdated={(u) => setUser((prev) => (prev ? { ...prev, name: u.name } : prev))}
+            onBack={() => navigate(AGENDA_PATH)}
+            telegramLinked={telegramLinked}
+            telegramWaiting={telegramWaiting}
+            telegramConnecting={submitting['telegram']}
+            onConnectTelegram={handleConnectTelegram}
+            onUnlinkTelegram={openUnlinkTelegramDialog}
+            googleStatus={googleStatus}
+            onConnectGoogle={handleConnectGoogle}
+            onDisconnectGoogle={openDisconnectGoogleDialog}
+          />
+        ) : rawPath === COMPARTILHAR_PATH && canShareSelected && activeCalendar ? (
           <CompartilharPage
             calendar={activeCalendar}
             me={user}

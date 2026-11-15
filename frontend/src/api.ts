@@ -298,3 +298,30 @@ export async function unlinkCalendarFromGoogle(
   return apiRequest<Calendar>(`/agendas/${calendarId}/google`, { method: 'DELETE' }, token);
 }
 
+export async function updateProfile(token: string, name: string): Promise<User> {
+  return apiRequest<User>(
+    '/auth/me',
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    },
+    token,
+  );
+}
+
+export async function changePassword(
+  token: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ ok: boolean; message: string }> {
+  return apiRequest<{ ok: boolean; message: string }>(
+    '/auth/me/senha',
+    {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    },
+    token,
+  );
+}
+
+
