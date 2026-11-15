@@ -14,9 +14,11 @@ describe('AuthService', () => {
   let mockAuditService: any;
   let mockMetricsService: any;
   let validPasswordHash: string;
+  let strongPasswordHash: string;
 
   beforeAll(async () => {
     validPasswordHash = await bcrypt.hash('123456', 4);
+    strongPasswordHash = await bcrypt.hash('senhaForte1', 4);
   });
 
   beforeEach(() => {
@@ -150,7 +152,7 @@ describe('AuthService', () => {
         id: 'u-ana',
         name: 'Ana',
         email: 'ana@x.com',
-        passwordHash: validPasswordHash,
+        passwordHash: strongPasswordHash,
         role: UserRole.USER,
         telegramChatId: null,
         preferredChannel: 'TELEGRAM',
@@ -166,7 +168,7 @@ describe('AuthService', () => {
       await authService.register({
         name: 'Ana',
         email: 'ana@x.com',
-        password: '123456',
+        password: 'senhaForte1',
         role: 'ADMIN',
       } as any);
 
@@ -182,6 +184,40 @@ describe('AuthService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             type: CalendarType.PERSONAL,
+            name: 'Minha agenda',
+          }),
+        }),
+      );
+    });
+
+    it('deve limpar espaços extras do nome ao registrar', async () => {
+      const createdUser = {
+        id: 'u-ana',
+        name: 'Ana Souza',
+        email: 'ana@x.com',
+        passwordHash: strongPasswordHash,
+        role: UserRole.USER,
+        telegramChatId: null,
+        preferredChannel: 'TELEGRAM',
+      };
+
+      mockPrisma.user.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(createdUser);
+
+      mockPrisma.user.create.mockResolvedValue(createdUser);
+      mockPrisma.calendar.create.mockResolvedValue({ id: 'cal-1' });
+
+      await authService.register({
+        name: '  Ana   Souza ',
+        email: 'ana@x.com',
+        password: 'senhaForte1',
+      });
+
+      expect(mockPrisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            name: 'Ana Souza',
           }),
         }),
       );
@@ -197,9 +233,13 @@ describe('AuthService', () => {
         authService.register({
           name: 'Ana Repetida',
           email: 'repetido@x.com',
-          password: '123456',
+          password: 'senhaForte1',
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(
+        new BadRequestException(
+          'Não foi possível criar a conta com este e-mail. Se você já tem conta, entre ou recupere a senha.',
+        ),
+      );
 
       expect(mockPrisma.user.create).not.toHaveBeenCalled();
     });

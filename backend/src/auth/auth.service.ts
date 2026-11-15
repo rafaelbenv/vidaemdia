@@ -67,15 +67,18 @@ export class AuthService {
     const email = dto.email.toLowerCase().trim();
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) {
-      throw new BadRequestException('Já existe um usuário cadastrado com este e-mail');
+      throw new BadRequestException(
+        'Não foi possível criar a conta com este e-mail. Se você já tem conta, entre ou recupere a senha.',
+      );
     }
 
+    const name = typeof dto.name === 'string' ? dto.name.trim().replace(/\s+/g, ' ') : dto.name;
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const role = UserRole.USER;
 
     const user = await this.prisma.user.create({
       data: {
-        name: dto.name,
+        name,
         email,
         passwordHash,
         role,
@@ -88,7 +91,7 @@ export class AuthService {
       data: {
         ownerId: user.id,
         type: CalendarType.PERSONAL,
-        name: `Agenda Pessoal - ${user.name}`,
+        name: 'Minha agenda',
         description: 'Compromissos pessoais',
         color: '#2563EB',
       },
@@ -103,7 +106,7 @@ export class AuthService {
       ipAddress,
     });
 
-    return this.login({ email: dto.email, password: dto.password }, ipAddress);
+    return this.login({ email, password: dto.password }, ipAddress);
   }
 
   async getProfile(userId: string) {

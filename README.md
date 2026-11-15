@@ -287,6 +287,8 @@ A estrutura do banco de dados PostgreSQL é versionada através do Prisma em `ba
 | `PROFESSIONAL` | Dra. Ana Costa | `dra.ana@vidaemdia.com.br` | Possui Agenda Profissional **restrita** (retorna **403 Acesso Negado** se a Secretária Maria tentar acessar). |
 | `SECRETARY` | Maria Oliveira | `secretaria.maria@vidaemdia.com.br` | Acessa e gerencia a agenda do Dr. João (`200 OK`) e é bloqueada na agenda da Dra. Ana (`403 Forbidden`). |
 
+> Contas criadas pelo cadastro (`POST /auth/register`) são de uso pessoal (papel `USER`), recebem a agenda "Minha agenda" e exigem senha de 8 a 72 caracteres com pelo menos uma letra e um número; as contas do seed mantêm a senha `123456`.
+
 ---
 
 ## 7. Procedimentos de Backup e Recuperação (DevOps)
