@@ -53,6 +53,7 @@ import {
 } from './lib/format';
 import { toDateKey } from './lib/dates';
 import { formatRemindSuffix } from './lib/reminderText';
+import { ativarPrimeirosPassos } from './lib/primeirosPassos';
 import {
   AGENDA_PATH,
   COMPARTILHAR_PATH,
@@ -534,6 +535,7 @@ export function App() {
     try {
       setLoading(true);
       const res = await register(name, email, password);
+      ativarPrimeirosPassos(res.user.id);
       startSession(res, `Conta criada. Bem-vindo(a), ${firstName(res.user.name)}!`);
       return null;
     } catch (err: unknown) {
@@ -1286,6 +1288,9 @@ export function App() {
             telegramWaiting={telegramWaiting}
             telegramConnecting={submitting['telegram']}
             onConnectTelegram={handleConnectTelegram}
+            googleConfigured={googleStatus.configured}
+            googleConnected={googleStatus.connected}
+            onConnectGoogle={handleConnectGoogle}
           />
         )}
       </main>

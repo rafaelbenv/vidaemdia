@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { formatLongDate, monthGridDays } from '../lib/dates';
 import { reminderLine } from '../lib/reminderText';
 import { historySentence } from '../lib/historySentence';
 import { firstName } from '../lib/format';
+import {
+  ativarPrimeirosPassos,
+  dispensarPrimeirosPassos,
+  primeirosPassosAtivo,
+} from '../lib/primeirosPassos';
 import { Appointment, AuditLogEntry, User } from '../types';
 
 describe('lib (funções puras)', () => {
@@ -207,6 +212,28 @@ describe('lib (funções puras)', () => {
   describe('firstName', () => {
     it('Dr. João Mendes (Cardiologista) === "João"', () => {
       expect(firstName('Dr. João Mendes (Cardiologista)')).toBe('João');
+    });
+  });
+
+  describe('primeirosPassos', () => {
+    beforeEach(() => {
+      localStorage.clear();
+    });
+
+    it('sem valor gravado (contas antigas) retorna false', () => {
+      expect(primeirosPassosAtivo('user-antigo')).toBe(false);
+    });
+
+    it('ativarPrimeirosPassos grava "ativo" e primeirosPassosAtivo retorna true', () => {
+      ativarPrimeirosPassos('user-novo');
+      expect(primeirosPassosAtivo('user-novo')).toBe(true);
+    });
+
+    it('dispensarPrimeirosPassos grava "dispensado" e primeirosPassosAtivo retorna false', () => {
+      ativarPrimeirosPassos('user-novo');
+      expect(primeirosPassosAtivo('user-novo')).toBe(true);
+      dispensarPrimeirosPassos('user-novo');
+      expect(primeirosPassosAtivo('user-novo')).toBe(false);
     });
   });
 });

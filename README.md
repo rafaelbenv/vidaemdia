@@ -289,7 +289,7 @@ A estrutura do banco de dados PostgreSQL é versionada através do Prisma em `ba
 
 > Os botões das contas de demonstração na tela de login só aparecem com `VITE_SHOW_DEMO_ACCOUNTS=true` no `.env` (e rebuild do front: `docker compose up -d --build frontend`).
 >
-> Qualquer pessoa pode criar uma conta pessoal em `/criar-conta` (link "Criar conta" na tela de login).
+> Qualquer pessoa pode criar uma conta pessoal em `/criar-conta` (link "Criar conta" na tela de login). Na primeira entrada, a conta nova vê o cartão "Primeiros passos" (Telegram, primeiro compromisso e, se configurado, Google Agenda), que pode ser dispensado.
 >
 > Contas criadas pelo cadastro (`POST /auth/register`) são de uso pessoal (papel `USER`), recebem a agenda "Minha agenda" e exigem senha de 8 a 72 caracteres com pelo menos uma letra e um número; as contas do seed mantêm a senha `123456`.
 

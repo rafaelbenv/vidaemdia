@@ -18,6 +18,11 @@ import { WeekStrip } from '../components/agenda/WeekStrip';
 import { DayList } from '../components/agenda/DayList';
 import { MonthGrid } from '../components/agenda/MonthGrid';
 import { TelegramCard } from '../components/agenda/TelegramCard';
+import { PrimeirosPassosCard } from '../components/agenda/PrimeirosPassosCard';
+import {
+  dispensarPrimeirosPassos,
+  primeirosPassosAtivo,
+} from '../lib/primeirosPassos';
 
 export interface AgendaPageProps {
   user: User;
@@ -31,6 +36,9 @@ export interface AgendaPageProps {
   telegramWaiting?: boolean;
   telegramConnecting?: boolean;
   onConnectTelegram: () => void;
+  googleConfigured?: boolean;
+  googleConnected?: boolean;
+  onConnectGoogle?: () => void;
 }
 
 export function AgendaPage({
@@ -45,9 +53,20 @@ export function AgendaPage({
   telegramWaiting,
   telegramConnecting,
   onConnectTelegram,
+  googleConfigured,
+  googleConnected,
+  onConnectGoogle,
 }: AgendaPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [now, setNow] = useState(() => new Date());
+  const [primeirosPassos, setPrimeirosPassos] = useState(() =>
+    primeirosPassosAtivo(user.id),
+  );
+
+  useEffect(() => {
+    setPrimeirosPassos(primeirosPassosAtivo(user.id));
+  }, [user.id]);
+
   const [telegramCardDismissed, setTelegramCardDismissed] = useState<boolean>(() => {
     try {
       return typeof window !== 'undefined' && sessionStorage['vidaemdia_tg_card'] === 'hidden';
@@ -185,7 +204,38 @@ export function AgendaPage({
     );
   }, [appointments, selectedDayKey]);
 
-  const showTelegramCard = !telegramLinked && !telegramCardDismissed;
+  const telegramDone = Boolean(telegramLinked);
+  const appointmentDone = isOwnCalendar && appointments.length > 0;
+  const showGoogle = Boolean(googleConfigured && onConnectGoogle);
+  const googleDone = Boolean(googleConnected);
+
+  useEffect(() => {
+    if (
+      primeirosPassos &&
+      telegramDone &&
+      appointmentDone &&
+      (!showGoogle || googleDone)
+    ) {
+      dispensarPrimeirosPassos(user.id);
+      setPrimeirosPassos(false);
+    }
+  }, [
+    primeirosPassos,
+    telegramDone,
+    appointmentDone,
+    showGoogle,
+    googleDone,
+    user.id,
+  ]);
+
+  const handleDismissPrimeirosPassos = () => {
+    dispensarPrimeirosPassos(user.id);
+    setPrimeirosPassos(false);
+  };
+
+  const showPrimeirosPassosCard = primeirosPassos && isOwnCalendar;
+  const showTelegramCard =
+    !telegramLinked && !telegramCardDismissed && !showPrimeirosPassosCard;
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
@@ -264,6 +314,23 @@ export function AgendaPage({
           )}
         </div>
       </div>
+
+      {showPrimeirosPassosCard && (
+        <div className="mt-4">
+          <PrimeirosPassosCard
+            telegramDone={telegramDone}
+            telegramWaiting={Boolean(telegramWaiting)}
+            telegramConnecting={Boolean(telegramConnecting)}
+            onConnectTelegram={onConnectTelegram}
+            appointmentDone={appointmentDone}
+            onNewAppointment={handleOpenNew}
+            showGoogle={showGoogle}
+            googleDone={googleDone}
+            onConnectGoogle={onConnectGoogle ?? (() => {})}
+            onDismiss={handleDismissPrimeirosPassos}
+          />
+        </div>
+      )}
 
       {showTelegramCard && (
         <div className="mt-4">
