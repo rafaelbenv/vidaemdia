@@ -1,8 +1,22 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto } from './dto/auth.dto';
+import {
+  ChangePasswordDto,
+  LoginDto,
+  RegisterDto,
+  UpdateProfileDto,
+} from './dto/auth.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 @ApiTags('Autenticação (JWT & OAuth)')
@@ -33,5 +47,22 @@ export class AuthController {
   async me(@Req() req: any) {
     return this.authService.getProfile(req.user.sub);
   }
-}
 
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Altera o nome do usuário autenticado' })
+  async updateProfile(@Body() dto: UpdateProfileDto, @Req() req: any) {
+    return this.authService.updateProfile(req.user.sub, dto, req.ip);
+  }
+
+  @Post('me/senha')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Troca a senha do usuário autenticado (exige a senha atual)' })
+  async changePassword(@Body() dto: ChangePasswordDto, @Req() req: any) {
+    return this.authService.changePassword(req.user.sub, dto, req.ip);
+  }
+}

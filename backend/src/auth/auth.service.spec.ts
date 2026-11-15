@@ -1,4 +1,8 @@
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { CalendarType, UserRole } from '@prisma/client';
@@ -26,6 +30,7 @@ describe('AuthService', () => {
       user: {
         findUnique: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
       },
       calendar: {
         create: jest.fn(),
@@ -242,6 +247,161 @@ describe('AuthService', () => {
       );
 
       expect(mockPrisma.user.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateProfile', () => {
+    it('grava o nome, registra auditoria UPDATE e devolve o perfil', async () => {
+      const updatedUser = {
+        id: 'u1',
+        name: 'Carlos Silva',
+        email: 'carlos@vidaemdia.com.br',
+        role: UserRole.USER,
+        telegramChatId: null,
+        preferredChannel: 'TELEGRAM',
+        createdAt: new Date(),
+      };
+
+      mockPrisma.user.update.mockResolvedValue(updatedUser);
+      mockPrisma.user.findUnique.mockResolvedValue(updatedUser);
+
+      const result = await authService.updateProfile(
+        'u1',
+        { name: '  Carlos   Silva  ' },
+        '127.0.0.1',
+      );
+
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'u1' },
+        data: { name: 'Carlos Silva' },
+      });
+
+      expect(mockAuditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actorUserId: 'u1',
+          entityType: 'AUTH',
+          entityId: 'u1',
+          action: 'UPDATE',
+          details: 'Nome alterado para Carlos Silva.',
+          ipAddress: '127.0.0.1',
+        }),
+      );
+
+      expect(result).toEqual({
+        id: 'u1',
+        name: 'Carlos Silva',
+        email: 'carlos@vidaemdia.com.br',
+        role: UserRole.USER,
+        preferredChannel: 'TELEGRAM',
+        createdAt: expect.any(Date),
+        telegramLinked: false,
+      });
+    });
+  });
+
+  describe('changePassword', () => {
+    it('deve lançar NotFoundException quando o usuário não existir', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        authService.changePassword('u-inexistente', {
+          currentPassword: 'senhaForte1',
+          newPassword: 'novaSenhaForte2',
+        }),
+      ).rejects.toThrow(new NotFoundException('Usuário não encontrado'));
+    });
+
+    it('deve falhar com BadRequestException e registrar falha quando a senha atual estiver errada', async () => {
+      const user = {
+        id: 'u1',
+        name: 'Carlos',
+        email: 'carlos@x.com',
+        passwordHash: strongPasswordHash,
+      };
+      mockPrisma.user.findUnique.mockResolvedValue(user);
+
+      await expect(
+        authService.changePassword('u1', {
+          currentPassword: 'senhaIncorreta1',
+          newPassword: 'novaSenhaForte2',
+        }),
+      ).rejects.toThrow(new BadRequestException('A senha atual está incorreta.'));
+
+      expect(mockMetricsService.incrementAuthFailure).toHaveBeenCalled();
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('deve falhar com BadRequestException quando a senha nova for igual à atual', async () => {
+      const user = {
+        id: 'u1',
+        name: 'Carlos',
+        email: 'carlos@x.com',
+        passwordHash: strongPasswordHash,
+      };
+      mockPrisma.user.findUnique.mockResolvedValue(user);
+
+      await expect(
+        authService.changePassword('u1', {
+          currentPassword: 'senhaForte1',
+          newPassword: 'senhaForte1',
+        }),
+      ).rejects.toThrow(
+        new BadRequestException('A senha nova precisa ser diferente da atual.'),
+      );
+
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('deve trocar a senha com sucesso, gravar novo hash e registrar auditoria sem expor a senha', async () => {
+      const user = {
+        id: 'u1',
+        name: 'Carlos',
+        email: 'carlos@x.com',
+        passwordHash: strongPasswordHash,
+      };
+      mockPrisma.user.findUnique.mockResolvedValue(user);
+      mockPrisma.user.update.mockResolvedValue({ ...user });
+
+      const result = await authService.changePassword(
+        'u1',
+        {
+          currentPassword: 'senhaForte1',
+          newPassword: 'novaSenhaForte2',
+        },
+        '192.168.1.1',
+      );
+
+      expect(result).toEqual({ ok: true, message: 'Senha alterada.' });
+
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'u1' },
+        data: {
+          passwordHash: expect.any(String),
+        },
+      });
+
+      const updateCall = mockPrisma.user.update.mock.calls[0][0];
+      const isNewHashValid = await bcrypt.compare(
+        'novaSenhaForte2',
+        updateCall.data.passwordHash,
+      );
+      expect(isNewHashValid).toBe(true);
+
+      expect(mockAuditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actorUserId: 'u1',
+          entityType: 'AUTH',
+          entityId: 'u1',
+          action: 'UPDATE',
+          details: 'Senha alterada.',
+          ipAddress: '192.168.1.1',
+        }),
+      );
+
+      const auditCalls = mockAuditService.log.mock.calls;
+      const logDetails = auditCalls[auditCalls.length - 1][0].details;
+      expect(logDetails).not.toContain('novaSenhaForte2');
+      expect(logDetails).not.toContain('senhaForte1');
     });
   });
 });

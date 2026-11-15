@@ -1,7 +1,7 @@
 import { ValidationPipe } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { RegisterDto } from './auth.dto';
+import { ChangePasswordDto, RegisterDto, UpdateProfileDto } from './auth.dto';
 
 describe('RegisterDto', () => {
   const pipe = new ValidationPipe({
@@ -102,5 +102,57 @@ describe('RegisterDto', () => {
       password: 'senhaForte1',
     });
     expect(dto.email).toBe('ana@exemplo.com');
+  });
+});
+
+describe('UpdateProfileDto', () => {
+  it('recusa nome vazio e com 81 caracteres', async () => {
+    const dtoVazio = plainToInstance(UpdateProfileDto, { name: '' });
+    const errorsVazio = await validate(dtoVazio);
+    expect(errorsVazio.some((e) => e.property === 'name')).toBe(true);
+
+    const dtoEspacos = plainToInstance(UpdateProfileDto, { name: '     ' });
+    const errorsEspacos = await validate(dtoEspacos);
+    expect(errorsEspacos.some((e) => e.property === 'name')).toBe(true);
+
+    const dtoLongo = plainToInstance(UpdateProfileDto, { name: 'a'.repeat(81) });
+    const errorsLongo = await validate(dtoLongo);
+    expect(errorsLongo.some((e) => e.property === 'name')).toBe(true);
+  });
+
+  it('limpa espaços do nome ao transformar', async () => {
+    const dto = plainToInstance(UpdateProfileDto, { name: '  Carlos   Silva  ' });
+    expect(dto.name).toBe('Carlos Silva');
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
+  });
+});
+
+describe('ChangePasswordDto', () => {
+  it('recusa currentPassword vazia', async () => {
+    const dto = plainToInstance(ChangePasswordDto, {
+      currentPassword: '',
+      newPassword: 'senhaForte1',
+    });
+    const errors = await validate(dto);
+    expect(errors.some((e) => e.property === 'currentPassword')).toBe(true);
+  });
+
+  it('recusa newPassword fraca (apenas letras)', async () => {
+    const dto = plainToInstance(ChangePasswordDto, {
+      currentPassword: '123456',
+      newPassword: 'abcdefgh',
+    });
+    const errors = await validate(dto);
+    expect(errors.some((e) => e.property === 'newPassword')).toBe(true);
+  });
+
+  it('aceita currentPassword e newPassword válidas', async () => {
+    const dto = plainToInstance(ChangePasswordDto, {
+      currentPassword: '123456',
+      newPassword: 'senhaForte1',
+    });
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
   });
 });

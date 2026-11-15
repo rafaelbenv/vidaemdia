@@ -1,10 +1,20 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { CalendarType, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { LoginDto, RegisterDto } from './dto/auth.dto';
+import {
+  ChangePasswordDto,
+  LoginDto,
+  RegisterDto,
+  UpdateProfileDto,
+} from './dto/auth.dto';
 import { MetricsService } from '../monitoring/metrics.service';
 
 @Injectable()
@@ -133,5 +143,61 @@ export class AuthService {
       telegramLinked: Boolean(telegramChatId),
     };
   }
-}
 
+  async updateProfile(userId: string, dto: UpdateProfileDto, ipAddress?: string) {
+    const name = typeof dto.name === 'string' ? dto.name.trim().replace(/\s+/g, ' ') : dto.name;
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { name },
+    });
+
+    await this.auditService.log({
+      actorUserId: userId,
+      entityType: 'AUTH',
+      entityId: userId,
+      action: 'UPDATE',
+      details: `Nome alterado para ${name}.`,
+      ipAddress,
+    });
+
+    return this.getProfile(userId);
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto, ipAddress?: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    const isCurrentValid = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+    if (!isCurrentValid) {
+      this.metricsService.incrementAuthFailure();
+      throw new BadRequestException('A senha atual está incorreta.');
+    }
+
+    const isSamePassword = await bcrypt.compare(dto.newPassword, user.passwordHash);
+    if (isSamePassword) {
+      throw new BadRequestException('A senha nova precisa ser diferente da atual.');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    await this.auditService.log({
+      actorUserId: userId,
+      entityType: 'AUTH',
+      entityId: userId,
+      action: 'UPDATE',
+      details: 'Senha alterada.',
+      ipAddress,
+    });
+
+    return { ok: true, message: 'Senha alterada.' };
+  }
+}
