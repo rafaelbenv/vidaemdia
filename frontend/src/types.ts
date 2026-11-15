@@ -104,7 +104,7 @@ export interface Appointment {
 export interface ProfessionalDirectoryEntry {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   calendars: Array<{
     id: string;
     name: string;

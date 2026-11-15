@@ -142,7 +142,7 @@ export async function getNotificationsStatus(token: string): Promise<Notificatio
 }
 
 export async function getHealth(token: string): Promise<HealthData> {
-  return apiRequest<HealthData>('/health', {}, token);
+  return apiRequest<HealthData>('/health/detalhes', {}, token);
 }
 
 export async function getAppointments(token: string, calendarId: string): Promise<Appointment[]> {

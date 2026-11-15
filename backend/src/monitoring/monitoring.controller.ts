@@ -1,7 +1,9 @@
-import { Controller, Get, Header } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Header, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MetricsService } from './metrics.service';
+import { JwtAuthGuard, RbacGuard, Roles } from '../auth/jwt-auth.guard';
 
 @ApiTags('Monitoramento, Healthcheck & Métricas (DevOps)')
 @Controller()
@@ -14,6 +16,30 @@ export class MonitoringController {
   @Get('health')
   @ApiOperation({ summary: 'Healthcheck da aplicação e conectividade com o PostgreSQL' })
   async healthCheck() {
+    let dbStatus = 'UP';
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+    } catch {
+      dbStatus = 'DOWN';
+    }
+
+    return {
+      status: dbStatus === 'UP' ? 'OK' : 'DEGRADED',
+      timestamp: new Date().toISOString(),
+      services: {
+        backend: 'UP',
+        postgresql: dbStatus,
+        notificationWorker: 'UP',
+      },
+    };
+  }
+
+  @Get('health/detalhes')
+  @UseGuards(JwtAuthGuard, RbacGuard)
+  @Roles(UserRole.PROFESSIONAL, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Healthcheck detalhado com estatísticas do banco e métricas de negócio' })
+  async getHealthDetails() {
     let dbStatus = 'UP';
     try {
       await this.prisma.$queryRaw`SELECT 1`;

@@ -287,6 +287,10 @@ A estrutura do banco de dados PostgreSQL é versionada através do Prisma em `ba
 | `PROFESSIONAL` | Dra. Ana Costa | `dra.ana@vidaemdia.com.br` | Possui Agenda Profissional **restrita** (retorna **403 Acesso Negado** se a Secretária Maria tentar acessar). |
 | `SECRETARY` | Maria Oliveira | `secretaria.maria@vidaemdia.com.br` | Acessa e gerencia a agenda do Dr. João (`200 OK`) e é bloqueada na agenda da Dra. Ana (`403 Forbidden`). |
 
+> **Diretório de profissionais:** O endpoint `GET /agendas/profissionais` lista os profissionais e suas agendas profissionais só para a secretária (sem o e-mail deles) e para o Administrador (com e-mail); os demais papéis, inclusive as contas criadas pelo cadastro, recebem uma lista vazia.
+>
+> **Lembrete para o servidor público:** Defina `VITE_SHOW_BASTIDORES=false` no `.env` antes do build do front para ocultar a aba técnica de bastidores.
+>
 > Os botões das contas de demonstração na tela de login só aparecem com `VITE_SHOW_DEMO_ACCOUNTS=true` no `.env` (e rebuild do front: `docker compose up -d --build frontend`).
 >
 > Qualquer pessoa pode criar uma conta pessoal em `/criar-conta` (link "Criar conta" na tela de login). Na primeira entrada, a conta nova vê o cartão "Primeiros passos" (Telegram, primeiro compromisso e, se configurado, Google Agenda), que pode ser dispensado.
@@ -328,6 +332,7 @@ A estrutura do banco de dados PostgreSQL é versionada através do Prisma em `ba
 ## 8. Monitoramento e Alertas (Prometheus & Grafana)
 
 A stack de monitoramento é composta pelo **Prometheus** (coleta de métricas e avaliação de alertas) e pelo **Grafana** (visualização):
+- **Isolamento de métricas e saúde do sistema:** O endpoint `/metrics` só é acessível na rede interna (o Prometheus coleta direto em `backend:3000`; o nginx responde 404 em `/api/metrics`). O `/health` público só informa se o sistema está no ar (`status`, `timestamp` e `services`); os números e estatísticas do banco ficam em `GET /health/detalhes` (restrito aos papéis Profissional e Admin via RBAC).
 - **Dashboard provisionado:** O dashboard **"VidaEmDia — Visão geral"** é provisionado automaticamente na pasta **`VidaEmDia`** no Grafana (`http://localhost:8080/grafana/`).
 - **Painel de alertas:** O painel **"Alertas disparados"** exibe em tempo real os alertas ativos avaliados pelo Prometheus (`ALERTS{alertstate="firing"}`).
 - **Regras de alerta configuradas (`infra/monitoring/alerts.yml`):**

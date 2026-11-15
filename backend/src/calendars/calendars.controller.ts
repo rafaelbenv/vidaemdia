@@ -24,7 +24,7 @@ export class CalendarsController {
   @Get('profissionais')
   @ApiOperation({ summary: 'Lista diretório de profissionais para seleção no Fluxo RBAC da Secretária' })
   async listProfessionals(@Req() req: any) {
-    return this.calendarsService.listProfessionalsDirectory(req.user.sub);
+    return this.calendarsService.listProfessionalsDirectory(req.user.sub, req.user.role);
   }
 
   @Get(':id/verificar-acesso')

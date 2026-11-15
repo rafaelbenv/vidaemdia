@@ -57,9 +57,17 @@ export class CalendarsService {
    * Lista todos os profissionais e suas agendas profissionais para que a Secretária possa selecionar
    * na interface (ex.: Dr. João autorizado vs Dra. Ana não autorizada) e testar o Fluxo RBAC do diagrama!
    */
-  async listProfessionalsDirectory(currentUserId: string) {
+  async listProfessionalsDirectory(currentUserId: string, role?: string) {
+    if (role !== 'SECRETARY' && role !== 'ADMIN') {
+      return [];
+    }
+
+    // A secretária vê os profissionais (para escolher a agenda e testar o RBAC), mas sem o e-mail;
+    // só o Admin recebe o e-mail. Contas pessoais e profissionais recebem lista vazia (acima).
+    const where = { role: 'PROFESSIONAL' as const };
+
     const professionals = await this.prisma.user.findMany({
-      where: { role: 'PROFESSIONAL' },
+      where,
       select: {
         id: true,
         name: true,
@@ -79,7 +87,7 @@ export class CalendarsService {
     return professionals.map((prof) => ({
       id: prof.id,
       name: prof.name,
-      email: prof.email,
+      email: role === 'ADMIN' ? prof.email : null,
       calendars: prof.ownedCalendars.map((cal) => {
         const perm = cal.permissions[0];
         return {

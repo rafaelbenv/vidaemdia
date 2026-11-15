@@ -460,6 +460,50 @@ export function installMockApi(seed?: MockApiSeed) {
       return jsonResponse([]);
     }
 
+    // GET /health/detalhes
+    if (route === '/health/detalhes' && method === 'GET') {
+      return jsonResponse({
+        status: 'OK',
+        timestamp: new Date().toISOString(),
+        services: {
+          backend: 'UP',
+          postgresql: 'UP',
+          notificationWorker: 'UP',
+        },
+        databaseStats: {
+          usersCount: currentUsers.length,
+          calendarsCount: currentCalendars.length,
+          appointmentsCount: currentAppointments.length,
+          pendingRemindersCount: 0,
+          auditLogsCount: 0,
+        },
+        metrics: {
+          appointmentsCreatedWeb: 0,
+          appointmentsCreatedTelegram: 0,
+          remindersSentTelegram: 0,
+          remindersFailed: 0,
+          rbacAccessDenied: 0,
+          authFailures: 0,
+          telegramUpdatesReceived: 0,
+          telegramApiErrors: 0,
+          uptimeSeconds: 100,
+        },
+      });
+    }
+
+    // GET /health
+    if (route === '/health' && method === 'GET') {
+      return jsonResponse({
+        status: 'OK',
+        timestamp: new Date().toISOString(),
+        services: {
+          backend: 'UP',
+          postgresql: 'UP',
+          notificationWorker: 'UP',
+        },
+      });
+    }
+
     // GET /compromissos
     if (route === '/compromissos' && method === 'GET') {
       const calId = searchParams.get('calendarId');

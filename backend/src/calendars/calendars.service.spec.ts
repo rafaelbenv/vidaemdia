@@ -223,4 +223,90 @@ describe('CalendarsService', () => {
       expect(mockAuditService.log).not.toHaveBeenCalled();
     });
   });
+
+  describe('listProfessionalsDirectory', () => {
+    it('deve devolver [] para role USER sem consultar o banco', async () => {
+      const result = await service.listProfessionalsDirectory('user-1', 'USER');
+      expect(result).toEqual([]);
+      expect(mockPrisma.user.findMany).not.toHaveBeenCalled();
+    });
+
+    it('deve devolver [] para role PROFESSIONAL sem consultar o banco', async () => {
+      const result = await service.listProfessionalsDirectory('prof-1', 'PROFESSIONAL');
+      expect(result).toEqual([]);
+      expect(mockPrisma.user.findMany).not.toHaveBeenCalled();
+    });
+
+    it('SECRETARY vê todos os profissionais, sem o e-mail', async () => {
+      mockPrisma.user.findMany.mockResolvedValue([
+        {
+          id: 'prof-1',
+          name: 'Dr. João',
+          email: 'joao@clinica.com',
+          ownedCalendars: [
+            {
+              id: 'cal-1',
+              name: 'Consultório',
+              description: 'Desc',
+              color: '#16A34A',
+              permissions: [{ canView: true, canCreate: true, canUpdate: true, canCancel: true }],
+            },
+          ],
+        },
+      ]);
+
+      const result = await service.listProfessionalsDirectory('sec-1', 'SECRETARY');
+
+      expect(mockPrisma.user.findMany).toHaveBeenCalledWith({
+        where: { role: 'PROFESSIONAL' },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          ownedCalendars: {
+            where: { type: 'PROFESSIONAL' },
+            include: {
+              permissions: {
+                where: { granteeUserId: 'sec-1' },
+              },
+            },
+          },
+        },
+        orderBy: { name: 'asc' },
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('prof-1');
+      expect(result[0].email).toBeNull();
+      expect(result[0].calendars[0].hasRbacAuthorization).toBe(true);
+    });
+
+    it('deve consultar sem filtro de permissão quando role for ADMIN', async () => {
+      mockPrisma.user.findMany.mockResolvedValue([]);
+
+      const result = await service.listProfessionalsDirectory('admin-1', 'ADMIN');
+
+      expect(mockPrisma.user.findMany).toHaveBeenCalledWith({
+        where: {
+          role: 'PROFESSIONAL',
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          ownedCalendars: {
+            where: { type: 'PROFESSIONAL' },
+            include: {
+              permissions: {
+                where: { granteeUserId: 'admin-1' },
+              },
+            },
+          },
+        },
+        orderBy: { name: 'asc' },
+      });
+
+      expect(result).toEqual([]);
+    });
+  });
 });

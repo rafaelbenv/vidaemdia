@@ -447,25 +447,48 @@ export function App() {
   }
 
   async function loadBastidoresData(jwt: string, options?: { silent?: boolean }) {
-    try {
-      const [profs, audits, notifStatus, health] = await Promise.all([
-        getProfessionals(jwt),
-        getAuditLogs(jwt),
-        getNotificationsStatus(jwt),
-        getHealth(jwt),
-      ]);
+    const [profsRes, auditsRes, notifRes, healthRes] = await Promise.allSettled([
+      getProfessionals(jwt),
+      getAuditLogs(jwt),
+      getNotificationsStatus(jwt),
+      getHealth(jwt),
+    ]);
 
-      setProfessionals(profs);
-      setAuditLogs(audits);
-      setWorkerStats(notifStatus.worker);
-      setRemindersQueue(notifStatus.reminders);
-      setDispatchedMessages(notifStatus.dispatchedMessages);
-      setHealthData(health);
-    } catch (err: unknown) {
-      if (options?.silent) {
-        return;
-      }
-      const status = errorStatus(err);
+    if (profsRes.status === 'fulfilled') {
+      setProfessionals(profsRes.value);
+    }
+    if (auditsRes.status === 'fulfilled') {
+      setAuditLogs(auditsRes.value);
+    }
+    if (notifRes.status === 'fulfilled') {
+      setWorkerStats(notifRes.value.worker);
+      setRemindersQueue(notifRes.value.reminders);
+      setDispatchedMessages(notifRes.value.dispatchedMessages);
+    }
+    if (healthRes.status === 'fulfilled') {
+      setHealthData(healthRes.value);
+    } else if (errorStatus(healthRes.reason) === 403) {
+      setHealthData(null);
+    }
+
+    if (options?.silent) {
+      return;
+    }
+
+    const results = [profsRes, auditsRes, notifRes, healthRes];
+    const rejected = results.filter(
+      (r): r is PromiseRejectedResult => r.status === 'rejected',
+    );
+
+    const allFailed = rejected.length === results.length;
+    const unexpectedErr = rejected.find((r) => {
+      const s = errorStatus(r.reason);
+      return s !== 401 && s !== 403;
+    });
+
+    if (allFailed || unexpectedErr) {
+      const errToReport = unexpectedErr?.reason ?? rejected[0]?.reason;
+      const status = errorStatus(errToReport);
       if (status !== 401) {
         setFeedbackBanner({
           type: 'error',
