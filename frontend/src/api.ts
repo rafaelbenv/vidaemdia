@@ -324,4 +324,25 @@ export async function changePassword(
   );
 }
 
+export async function requestPasswordCode(
+  email: string,
+): Promise<{ ok: boolean; message: string }> {
+  return apiRequest<{ ok: boolean; message: string }>('/auth/senha/esqueci', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPassword(
+  email: string,
+  code: string,
+  newPassword: string,
+): Promise<{ ok: boolean; message: string }> {
+  return apiRequest<{ ok: boolean; message: string }>('/auth/senha/redefinir', {
+    method: 'POST',
+    body: JSON.stringify({ email, code, newPassword }),
+  });
+}
+
+
 

@@ -58,6 +58,7 @@ import {
   AGENDA_PATH,
   COMPARTILHAR_PATH,
   CRIAR_CONTA_PATH,
+  ESQUECI_SENHA_PATH,
   HISTORICO_PATH,
   LOGIN_PATH,
   MINHA_CONTA_PATH,
@@ -79,6 +80,7 @@ import { BastidoresLayout } from './components/BastidoresLayout';
 import { AppointmentFormValues, AppointmentPanel } from './components/agenda/AppointmentPanel';
 import { LoginPage } from './pages/LoginPage';
 import { CriarContaPage } from './pages/CriarContaPage';
+import { EsqueciSenhaPage } from './pages/EsqueciSenhaPage';
 import { AgendaPage } from './pages/AgendaPage';
 import { CompartilharPage } from './pages/CompartilharPage';
 import { MinhaContaPage } from './pages/MinhaContaPage';
@@ -166,7 +168,7 @@ export function App() {
   useEffect(() => {
     const path = location.pathname.replace(/\/+$/, '') || '/';
     if (!token) {
-      if (path !== LOGIN_PATH && path !== CRIAR_CONTA_PATH) {
+      if (path !== LOGIN_PATH && path !== CRIAR_CONTA_PATH && path !== ESQUECI_SENHA_PATH) {
         navigate(LOGIN_PATH, { replace: true });
       }
       return;
@@ -1078,6 +1080,16 @@ export function App() {
         />
       );
     }
+    if (rawPath === ESQUECI_SENHA_PATH) {
+      return (
+        <EsqueciSenhaPage
+          onGoToLogin={(emailFeito?: string) => {
+            if (emailFeito) setEmail(emailFeito);
+            navigate(LOGIN_PATH);
+          }}
+        />
+      );
+    }
     return (
       <LoginPage
         email={email}
@@ -1088,6 +1100,7 @@ export function App() {
         loading={loading}
         onLogin={handleLogin}
         onGoToRegister={() => navigate(CRIAR_CONTA_PATH)}
+        onForgotPassword={() => navigate(ESQUECI_SENHA_PATH)}
       />
     );
   }

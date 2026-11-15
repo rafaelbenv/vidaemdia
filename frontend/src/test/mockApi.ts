@@ -182,6 +182,7 @@ let recordedCalls: ApiCall[] = [];
 let currentUsers: User[] = [];
 let currentCalendars: Calendar[] = [];
 let currentAppointments: Appointment[] = [];
+let userPasswords: Record<string, string> = {};
 let nextId = 100;
 
 export function calls(): ApiCall[] {
@@ -228,6 +229,7 @@ export interface MockApiSeed {
 
 export function installMockApi(seed?: MockApiSeed) {
   recordedCalls = [];
+  userPasswords = {};
   nextId = 100;
   currentUsers = seed?.users ? [...seed.users] : [USER_CARLOS, USER_DR_JOAO, USER_MARIA];
   currentCalendars = seed?.calendars
@@ -283,13 +285,42 @@ export function installMockApi(seed?: MockApiSeed) {
     if (route === '/auth/login' && method === 'POST') {
       const email = body?.email?.trim();
       const password = body?.password;
-      if (password === '123456') {
-        const found = currentUsers.find((u) => u.email === email);
+      const found = currentUsers.find((u) => u.email === email);
+      const customPassword = found ? userPasswords[found.email.toLowerCase()] : undefined;
+      if (password === '123456' || (customPassword && password === customPassword)) {
         if (found) {
           return jsonResponse({ accessToken: `token-${found.id}`, user: found });
         }
       }
       return jsonResponse({ message: 'E-mail ou senha incorretos' }, 401);
+    }
+
+    // POST /auth/senha/esqueci
+    if (route === '/auth/senha/esqueci' && method === 'POST') {
+      return jsonResponse({
+        ok: true,
+        message:
+          'Se o e-mail estiver cadastrado e com o Telegram vinculado, enviamos um código pelo Telegram.',
+      });
+    }
+
+    // POST /auth/senha/redefinir
+    if (route === '/auth/senha/redefinir' && method === 'POST') {
+      const email = body?.email?.trim();
+      const code = body?.code?.trim();
+      const newPassword = body?.newPassword;
+
+      if (code !== '123456') {
+        return jsonResponse(
+          { message: 'Código inválido ou expirado. Peça um novo código.' },
+          400,
+        );
+      }
+
+      if (email && newPassword) {
+        userPasswords[email.toLowerCase()] = newPassword;
+      }
+      return jsonResponse({ ok: true, message: 'Senha alterada. Entre com a senha nova.' });
     }
 
     // POST /auth/register

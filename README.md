@@ -294,6 +294,8 @@ A estrutura do banco de dados PostgreSQL é versionada através do Prisma em `ba
 > Contas criadas pelo cadastro (`POST /auth/register`) são de uso pessoal (papel `USER`), recebem a agenda "Minha agenda" e exigem senha de 8 a 72 caracteres com pelo menos uma letra e um número; as contas do seed mantêm a senha `123456`.
 >
 > Em **Minha conta** (menu do usuário, `/conta`) a pessoa muda o nome, troca a senha (pedindo a atual) e vê ou desfaz as conexões com o Telegram e o Google; rotas `PATCH /auth/me` e `POST /auth/me/senha` (limite de 5 trocas de senha por minuto), as duas registradas na auditoria.
+>
+> **Esqueci a senha** — quem vinculou o Telegram pede em `/esqueci-senha` um código de 6 números enviado pelo bot (vale 15 minutos, uso único, até 5 tentativas; limite de 3 pedidos por minuto). Rotas `POST /auth/senha/esqueci` e `POST /auth/senha/redefinir`. A resposta do pedido é sempre a mesma, para não revelar quais e-mails têm conta. Em `TELEGRAM_MODE=mock`, o código aparece no log do backend (`docker logs vidaemdia-backend`).
 
 ---
 

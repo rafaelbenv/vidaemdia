@@ -10,6 +10,7 @@ export type LucideIcon = typeof Bell;
 
 export const LOGIN_PATH = '/entrar';
 export const CRIAR_CONTA_PATH = '/criar-conta';
+export const ESQUECI_SENHA_PATH = '/esqueci-senha';
 export const AGENDA_PATH = '/agenda';
 export const COMPARTILHAR_PATH = '/agenda/compartilhar';
 export const HISTORICO_PATH = '/agenda/historico';

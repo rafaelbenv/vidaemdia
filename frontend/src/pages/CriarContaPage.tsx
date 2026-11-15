@@ -7,6 +7,15 @@ export interface CriarContaPageProps {
   onGoToLogin: () => void;
 }
 
+export function passwordRuleError(password: string): string | null {
+  const hasLetter = /[a-zA-Z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  if (password.length < 8 || password.length > 72 || !hasLetter || !hasNumber) {
+    return 'A senha precisa ter de 8 a 72 caracteres, com pelo menos uma letra e um número.';
+  }
+  return null;
+}
+
 export function CriarContaPage({ loading, onRegister, onGoToLogin }: CriarContaPageProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -30,10 +39,9 @@ export function CriarContaPage({ loading, onRegister, onGoToLogin }: CriarContaP
       return;
     }
 
-    const hasLetter = /[a-zA-Z]/.test(password);
-    const hasNumber = /\d/.test(password);
-    if (password.length < 8 || password.length > 72 || !hasLetter || !hasNumber) {
-      setError('A senha precisa ter de 8 a 72 caracteres, com pelo menos uma letra e um número.');
+    const pwdErr = passwordRuleError(password);
+    if (pwdErr) {
+      setError(pwdErr);
       return;
     }
 

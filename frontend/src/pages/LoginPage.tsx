@@ -11,6 +11,7 @@ export interface LoginPageProps {
   loading: boolean;
   onLogin: (e?: React.FormEvent, demo?: { email: string; password: string }) => Promise<void>;
   onGoToRegister?: () => void;
+  onForgotPassword?: () => void;
   showDemoAccounts?: boolean;
 }
 
@@ -29,6 +30,7 @@ export function LoginPage({
   loading,
   onLogin,
   onGoToRegister,
+  onForgotPassword,
   showDemoAccounts = SHOW_DEMO_ACCOUNTS,
 }: LoginPageProps) {
   return (
@@ -82,6 +84,17 @@ export function LoginPage({
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3.5 py-2 text-base border border-stone-300 rounded-md focus:ring-2 focus:ring-brand-700 focus:outline-none"
               />
+              {onForgotPassword && (
+                <div className="text-right mt-1">
+                  <button
+                    type="button"
+                    onClick={onForgotPassword}
+                    className="text-sm text-brand-700 hover:underline"
+                  >
+                    Esqueci a senha
+                  </button>
+                </div>
+              )}
             </div>
 
             <button
