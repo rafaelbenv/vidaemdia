@@ -170,7 +170,7 @@ describe('GoogleSyncWorker', () => {
       },
     });
 
-    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('ok');
+    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('envio', 'ok');
     expect(result.success).toBe(1);
   });
 
@@ -199,7 +199,7 @@ describe('GoogleSyncWorker', () => {
       },
     });
 
-    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('ok');
+    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('envio', 'ok');
   });
 
   it('patch com erro 404 cai para insertEvent', async () => {
@@ -229,7 +229,7 @@ describe('GoogleSyncWorker', () => {
         googleSyncError: null,
       },
     });
-    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('ok');
+    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('envio', 'ok');
   });
 
   it('patch com erro 410 cai para insertEvent', async () => {
@@ -284,7 +284,7 @@ describe('GoogleSyncWorker', () => {
         googleSyncError: null,
       },
     });
-    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('ok');
+    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('envio', 'ok');
   });
 
   it('delete com erro 404 conta como sucesso', async () => {
@@ -307,7 +307,7 @@ describe('GoogleSyncWorker', () => {
         data: expect.objectContaining({ status: 'DONE' }),
       }),
     );
-    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('ok');
+    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('envio', 'ok');
   });
 
   it('delete sem googleEventId não chama deleteEvent e conta como sucesso', async () => {
@@ -329,7 +329,7 @@ describe('GoogleSyncWorker', () => {
         googleSyncError: null,
       },
     });
-    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('ok');
+    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('envio', 'ok');
   });
 
   it('UPSERT de compromisso CANCELLED executa lógica de DELETE', async () => {
@@ -409,7 +409,7 @@ describe('GoogleSyncWorker', () => {
         }),
       }),
     );
-    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('erro');
+    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('envio', 'erro');
   });
 
   it('falha com tentativas sobrando volta para PENDING com nextRetryAt', async () => {
@@ -441,7 +441,7 @@ describe('GoogleSyncWorker', () => {
         }),
       }),
     );
-    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('erro');
+    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('envio', 'erro');
   });
 
   it('5ª falha marca job como FAILED e grava erro no appointment', async () => {
@@ -475,7 +475,7 @@ describe('GoogleSyncWorker', () => {
         }),
       }),
     );
-    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('erro');
+    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('envio', 'erro');
   });
 
   it('invalid_grant marca FAILED direto com mensagem específica', async () => {
@@ -505,6 +505,6 @@ describe('GoogleSyncWorker', () => {
         }),
       }),
     );
-    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('erro');
+    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('envio', 'erro');
   });
 });

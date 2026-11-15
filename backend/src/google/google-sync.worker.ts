@@ -267,7 +267,7 @@ export class GoogleSyncWorker {
       });
     }
 
-    // Sucesso → job DONE, reserva limpa; métrica incrementGoogleSync('ok')
+    // Sucesso → job DONE, reserva limpa; métrica incrementGoogleSync('envio', 'ok')
     await (this.prisma as any).googleSyncJob.update({
       where: { id: job.id },
       data: {
@@ -278,7 +278,7 @@ export class GoogleSyncWorker {
       },
     });
 
-    this.metricsService.incrementGoogleSync('ok');
+    this.metricsService.incrementGoogleSync('envio', 'ok');
   }
 
   private async handleJobError(job: any, error: any) {
@@ -342,6 +342,6 @@ export class GoogleSyncWorker {
       // Se compromisso foi deletado, ignora
     }
 
-    this.metricsService.incrementGoogleSync('erro');
+    this.metricsService.incrementGoogleSync('envio', 'erro');
   }
 }

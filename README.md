@@ -33,6 +33,8 @@ O projeto segue fielmente o diagrama arquitetural `VidaEmDia_Fluxo.drawio.html`:
    * No frontend, a interface de simulação do chatbot exige login prévio para operar com o usuário logado.
    * O bot em produção se conecta via Telegram real sob o username definido no `.env` (`TELEGRAM_BOT_USERNAME`).
 
+> **Fuso Horário:** O sistema assume o fuso de São Paulo (`America/Sao_Paulo`) para horários e lembretes; outros fusos estão fora desta versão.
+
 ---
 
 ## 2. Estrutura do Projeto
@@ -158,6 +160,34 @@ FRONTEND_URL="http://localhost:8080"
 > **Chave de Criptografia:** Gere a chave de 32 bytes (64 caracteres hexadecimais) com `openssl rand -hex 32`. Caso `GOOGLE_CLIENT_ID` esteja preenchido e a chave não possua 64 caracteres hexadecimais, o backend falha na inicialização por segurança.
 
 > ⚠️ **Aviso de expiração (Modo de teste):** Enquanto o aplicativo estiver em modo de teste no Google Cloud Console, o refresh token do Google expira automaticamente a cada **7 dias**, sendo necessário reconectar a conta.
+
+### Como funciona a sincronização
+
+- **Como ligar:** O dono da agenda conecta sua conta Google via OAuth 2.0 (pelo botão na interface ou via rota `GET /google/connect`) e escolhe qual agenda do Google será vinculada a cada agenda do VidaEmDia (`PUT /agendas/:id/google`). Somente o dono da agenda tem permissão para vincular, desvincular ou sincronizar.
+- **VidaEmDia → Google (Envio):** Criar, alterar e cancelar compromissos geram um job na fila (`GoogleSyncJob`). O worker (`GoogleSyncWorker`) executa a cada minuto (`GOOGLE_SYNC_CRON_EXPRESSION`, padrão `*/1 * * * *`). Em caso de falha transitória, tenta novamente com espera crescente de 1, 5, 15 e 30 minutos (`RETRY_DELAYS_MINUTES`), desistindo após 5 tentativas (marcando o status como `FAILED`). Conexão expirada (`invalid_grant`) ou dono sem conta Google conectada falham imediatamente sem novas tentativas.
+- **Google → VidaEmDia (Recebimento):** O serviço de pull (`GooglePullService`) executa a cada minuto (`GOOGLE_PULL_CRON_EXPRESSION`, padrão `*/1 * * * *`). Na primeira execução, busca eventos no intervalo de -24 horas a +60 dias; nas execuções seguintes, realiza sincronização incremental utilizando `syncToken`. Se o Google responder com status 410 (token expirado), o sistema descarta o token e recomeça a carga do zero. O eco das próprias alterações enviadas pelo VidaEmDia é detectado e ignorado comparando o `etag` do evento (`appt.googleEtag === ev.etag`). O dono pode forçar uma rodada de sincronização a qualquer momento pelo botão na interface ou via `POST /agendas/:id/google/sincronizar`.
+- **Regras de sincronização:**
+  - **Conflito de horário:** Conflitos de horário são sinalizados e não recusados. Eventos vindos do Google nunca são rejeitados; o sistema detecta sobreposições (`ConflictService`), marca `hasConflict: true` e exibe o aviso "Conflito de horário" na interface.
+  - **Dia inteiro:** Compromissos de dia inteiro recebem `allDay: true` (sem horário fixo de término) e o lembrete é agendado automaticamente para as 8h da manhã do dia do compromisso.
+  - **Privacidade:** Eventos marcados como privados ou confidenciais no Google recebem `isPrivate: true`. Usuários que não são donos da agenda (como secretárias ou administradores) visualizam o título como "Ocupado" e descrição vazia (`null`), e não podem alterar título ou descrição. Somente o dono vê o título real (marcado com "Privado") e a descrição.
+  - **Convites recusados:** Se o usuário recusar o convite no Google Agenda (`responseStatus === 'declined'`), o compromisso é cancelado no VidaEmDia (`CANCELLED`), lembretes pendentes são removidos e a ação é registrada na auditoria.
+  - **Última alteração vence:** Se houver um job de envio em processamento (`PROCESSING`), a alteração do Google é ignorada para aguardar o término. Se houver um job pendente (`PENDING`), compara-se o horário de atualização do Google (`ev.updated`) com o do compromisso (`appt.updatedAt`): se a alteração do Google for mais recente, o job pendente é marcado como `DONE` ("Substituído por alteração mais recente no Google Agenda") e o evento externo é aplicado; se a alteração local for mais recente ou igual, a alteração do Google é ignorada e o job enviará a versão local.
+
+#### Rotas da Integração com Google Agenda (`google.controller.ts`)
+
+| Método | Rota | Descrição |
+| :--- | :--- | :--- |
+| `GET` | `/google/status` | Retorna o status de conexão da conta com o Google Agenda. |
+| `GET` | `/google/connect` | Gera a URL de autorização OAuth 2.0 com o Google. |
+| `GET` | `/google/callback` | Callback de redirecionamento OAuth 2.0 acionado pelo Google. |
+| `DELETE` | `/google/link` | Desconecta o vínculo da conta do usuário com o Google Agenda. |
+| `GET` | `/google/calendars` | Lista as agendas do Google com permissão de escrita. |
+| `PUT` | `/agendas/:id/google` | Liga uma agenda do VidaEmDia a uma agenda do Google. |
+| `DELETE` | `/agendas/:id/google` | Desliga uma agenda do VidaEmDia da agenda do Google. |
+| `POST` | `/agendas/:id/google/sincronizar` | Força a sincronização imediata dos eventos com o Google Agenda. |
+
+- **Onde ver os erros:** A agenda e o compromisso registram mensagens de erro de sincronização nos campos `googleSyncError` (exibidos no modal de vínculo da agenda e no painel de detalhes do compromisso), acompanhados das marcas visuais na listagem de compromissos ("Google", "Conflito de horário", "Privado").
+- **Testes automatizados:** Os clients HTTP do Google (`GoogleCalendarClient` e `GoogleOAuthClient`) são cobertos por testes unitários com simulação do `fetch` global (`google-calendar.client.spec.ts` e `google-oauth.client.spec.ts`), garantindo que nenhum teste acesse a rede ou a API do Google de verdade.
 
 ---
 
@@ -295,3 +325,26 @@ A stack de monitoramento é composta pelo **Prometheus** (coleta de métricas e 
   - **`ErrosApiTelegram`** (`warning`): Erros repetidos na API do Telegram (mais de 5 erros em 15 minutos).
   - **`MuitosAcessosNegados`** (`warning`): Muitas tentativas de acesso a agendas sem permissão (mais de 10 tentativas em 10 minutos).
   - **`PossivelForcaBrutaLogin`** (`critical`): Mais de 20 falhas de login em 5 minutos.
+  - **`GoogleSyncFalhando`** (`warning`): Mais de 5 erros de sincronização com o Google em 15 minutos.
+  - **`FilaGoogleAcumulando`** (`warning`): Mais de 20 envios pendentes para o Google por mais de 10 minutos.
+
+### Métricas expostas em /metrics
+
+| Métrica | Tipo | Rótulos | Significado |
+| :--- | :--- | :--- | :--- |
+| `vidaemdia_appointments_created_total` | Counter | `source="WEB" \| "TELEGRAM"` | Total de compromissos criados por canal |
+| `vidaemdia_reminders_sent_total` | Counter | `channel="TELEGRAM"` | Total de lembretes enviados com sucesso pelo Worker |
+| `vidaemdia_reminders_failed_total` | Counter | *(nenhum)* | Total de falhas/retries no envio de lembretes |
+| `vidaemdia_telegram_updates_received_total` | Counter | *(nenhum)* | Total de updates recebidos da Telegram Bot API |
+| `vidaemdia_telegram_api_errors_total` | Counter | *(nenhum)* | Total de erros na API do Telegram |
+| `vidaemdia_rbac_access_denied_total` | Counter | *(nenhum)* | Total de bloqueios 403 RBAC (tentativa de acesso não autorizado) |
+| `vidaemdia_auth_failures_total` | Counter | *(nenhum)* | Total de falhas de autenticação JWT/Login |
+| `vidaemdia_google_sync_total` | Counter | `direction="envio" \| "recebimento"`, `result="ok" \| "erro"` | Total de sincronizações com o Google Agenda por sentido e resultado |
+| `vidaemdia_google_sync_queue` | Gauge | `status="PENDING" \| "FAILED"` | Jobs na fila de envio para o Google, por status |
+| `vidaemdia_google_last_pull_timestamp_seconds` | Gauge | *(nenhum)* | Hora (Unix, segundos) da última sincronização recebida do Google |
+| `vidaemdia_uptime_seconds` | Gauge | *(nenhum)* | Tempo de atividade do servidor backend em segundos |
+
+No dashboard Grafana (**VidaEmDia — Visão geral**), a linha **Google Agenda** reúne o monitoramento da integração:
+- **Sincronizações com o Google por sentido:** gráfico temporal (`timeseries`) com a taxa de sincronizações discriminadas por sentido (`direction`: `envio` ou `recebimento`) e resultado (`result`: `ok` ou `erro`).
+- **Fila de envio (pendentes / com falha):** indicadores instantâneos (`stat`) com a quantidade de jobs na fila por status (`PENDING` e `FAILED`).
+- **Última sincronização recebida:** indicador numérico (`stat`) exibindo o tempo relativo decorrido desde a última sincronização recebida do Google (`dateTimeFromNow`).

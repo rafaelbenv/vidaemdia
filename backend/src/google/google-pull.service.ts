@@ -164,7 +164,7 @@ export class GooglePullService {
         where: { id: calendar.id },
         data: { googleSyncError: message },
       });
-      this.metricsService.incrementGoogleSync('erro');
+      this.metricsService.incrementGoogleSync('recebimento', 'erro');
       throw err;
     }
 
@@ -268,7 +268,7 @@ export class GooglePullService {
           googleSyncError: null,
         },
       });
-      this.metricsService.incrementGoogleSync('ok');
+      this.metricsService.incrementGoogleSync('recebimento', 'ok');
 
       return { created, updated, cancelled, ignored };
     } catch (err: any) {
@@ -279,7 +279,7 @@ export class GooglePullService {
           googleSyncError: `Não foi possível receber do Google: ${message}`,
         },
       });
-      this.metricsService.incrementGoogleSync('erro');
+      this.metricsService.incrementGoogleSync('recebimento', 'erro');
       throw err;
     }
   }

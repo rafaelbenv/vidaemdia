@@ -149,7 +149,10 @@ describe('GooglePullService', () => {
         googleSyncError: null,
       },
     });
-    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('ok');
+    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith(
+      'recebimento',
+      'ok',
+    );
   });
 
   it('incremental manda só syncToken e não manda timeMin/timeMax', async () => {
@@ -238,7 +241,10 @@ describe('GooglePullService', () => {
         googleSyncError: null,
       },
     });
-    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('ok');
+    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith(
+      'recebimento',
+      'ok',
+    );
   });
 
   it('evento novo cria com createdVia GOOGLE, lembrete e auditoria com actorUserId vazio, sem chamar a fila', async () => {
@@ -647,7 +653,10 @@ describe('GooglePullService', () => {
         googleSyncError: 'Conexão com o Google expirou; conecte de novo.',
       },
     });
-    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('erro');
+    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith(
+      'recebimento',
+      'erro',
+    );
   });
 
   it('dono sem conta conectada grava erro específico', async () => {
@@ -665,7 +674,10 @@ describe('GooglePullService', () => {
         googleSyncError: 'O dono da agenda não tem o Google conectado.',
       },
     });
-    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith('erro');
+    expect(mockMetricsService.incrementGoogleSync).toHaveBeenCalledWith(
+      'recebimento',
+      'erro',
+    );
   });
 
   it('pullCalendarForOwner com quem não é dono → ForbiddenException', async () => {

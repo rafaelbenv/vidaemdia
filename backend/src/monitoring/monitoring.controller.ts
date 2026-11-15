@@ -52,8 +52,25 @@ export class MonitoringController {
   @Get('metrics')
   @Header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
   @ApiOperation({ summary: 'Exporta métricas no formato Prometheus para coleta e visualização no Grafana' })
-  getPrometheusMetrics(): string {
-    return this.metricsService.toPrometheusText();
+  async getPrometheusMetrics(): Promise<string> {
+    const [queuePending, queueFailed, maxSync] = await Promise.all([
+      (this.prisma as any).googleSyncJob
+        .count({ where: { status: 'PENDING' } })
+        .catch(() => 0),
+      (this.prisma as any).googleSyncJob
+        .count({ where: { status: 'FAILED' } })
+        .catch(() => 0),
+      (this.prisma as any).calendar
+        .aggregate({ _max: { googleLastSyncAt: true } })
+        .catch(() => null),
+    ]);
+
+    const lastPullAt: Date | null = maxSync?._max?.googleLastSyncAt ?? null;
+
+    return this.metricsService.toPrometheusText({
+      queuePending,
+      queueFailed,
+      lastPullAt,
+    });
   }
 }
-

@@ -54,3 +54,22 @@ groups:
         annotations:
           summary: "Muitas falhas de login em 5 minutos"
           description: "Muitas falhas de login em 5 minutos (mais de 20 falhas consecutivas, indicando possível ataque de força bruta)."
+
+      - alert: GoogleSyncFalhando
+        expr: sum(increase(vidaemdia_google_sync_total{result="erro"}[15m])) > 5
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Falhas repetidas na sincronização com o Google Agenda"
+          description: "Falhas repetidas na sincronização com o Google Agenda (mais de 5 erros nos últimos 15 minutos)."
+
+      - alert: FilaGoogleAcumulando
+        expr: vidaemdia_google_sync_queue{status="PENDING"} > 20
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Fila de envio para o Google parada ou acumulando"
+          description: "Fila de envio para o Google parada ou acumulando (mais de 20 jobs pendentes há mais de 10 minutos)."
+

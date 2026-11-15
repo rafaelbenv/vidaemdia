@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
 
+export interface GoogleSyncStats {
+  queuePending: number;
+  queueFailed: number;
+  lastPullAt: Date | null;
+}
+
 @Injectable()
 export class MetricsService {
   private readonly counters = {
@@ -11,8 +17,10 @@ export class MetricsService {
     authFailures: 0,
     telegramUpdatesReceived: 0,
     telegramApiErrors: 0,
-    googleSyncOk: 0,
-    googleSyncErro: 0,
+    googleEnvioOk: 0,
+    googleEnvioErro: 0,
+    googleRecebimentoOk: 0,
+    googleRecebimentoErro: 0,
   };
 
   incrementAppointmentCreated(source: 'WEB' | 'TELEGRAM') {
@@ -44,11 +52,16 @@ export class MetricsService {
     this.counters.telegramApiErrors++;
   }
 
-  incrementGoogleSync(result: 'ok' | 'erro') {
-    if (result === 'ok') {
-      this.counters.googleSyncOk++;
+  incrementGoogleSync(
+    direction: 'envio' | 'recebimento',
+    result: 'ok' | 'erro',
+  ) {
+    if (direction === 'envio') {
+      if (result === 'ok') this.counters.googleEnvioOk++;
+      else this.counters.googleEnvioErro++;
     } else {
-      this.counters.googleSyncErro++;
+      if (result === 'ok') this.counters.googleRecebimentoOk++;
+      else this.counters.googleRecebimentoErro++;
     }
   }
 
@@ -56,8 +69,8 @@ export class MetricsService {
     return { ...this.counters, uptimeSeconds: Math.floor(process.uptime()) };
   }
 
-  toPrometheusText(): string {
-    return [
+  toPrometheusText(google?: GoogleSyncStats): string {
+    const lines = [
       '# HELP vidaemdia_appointments_created_total Total de compromissos criados por canal',
       '# TYPE vidaemdia_appointments_created_total counter',
       `vidaemdia_appointments_created_total{source="WEB"} ${this.counters.appointmentsCreatedWeb}`,
@@ -87,16 +100,39 @@ export class MetricsService {
       '# TYPE vidaemdia_auth_failures_total counter',
       `vidaemdia_auth_failures_total ${this.counters.authFailures}`,
       '',
-      '# HELP vidaemdia_google_sync_total Total de sincronizações de eventos com o Google Agenda',
+      '# HELP vidaemdia_google_sync_total Total de sincronizações com o Google Agenda por sentido e resultado',
       '# TYPE vidaemdia_google_sync_total counter',
-      `vidaemdia_google_sync_total{result="ok"} ${this.counters.googleSyncOk}`,
-      `vidaemdia_google_sync_total{result="erro"} ${this.counters.googleSyncErro}`,
+      `vidaemdia_google_sync_total{direction="envio",result="ok"} ${this.counters.googleEnvioOk}`,
+      `vidaemdia_google_sync_total{direction="envio",result="erro"} ${this.counters.googleEnvioErro}`,
+      `vidaemdia_google_sync_total{direction="recebimento",result="ok"} ${this.counters.googleRecebimentoOk}`,
+      `vidaemdia_google_sync_total{direction="recebimento",result="erro"} ${this.counters.googleRecebimentoErro}`,
       '',
+    ];
+
+    if (google) {
+      const lastPullTimestamp = google.lastPullAt
+        ? Math.floor(google.lastPullAt.getTime() / 1000)
+        : 0;
+      lines.push(
+        '# HELP vidaemdia_google_sync_queue Jobs na fila de envio para o Google, por status',
+        '# TYPE vidaemdia_google_sync_queue gauge',
+        `vidaemdia_google_sync_queue{status="PENDING"} ${google.queuePending}`,
+        `vidaemdia_google_sync_queue{status="FAILED"} ${google.queueFailed}`,
+        '',
+        '# HELP vidaemdia_google_last_pull_timestamp_seconds Hora (Unix, segundos) da última sincronização recebida do Google',
+        '# TYPE vidaemdia_google_last_pull_timestamp_seconds gauge',
+        `vidaemdia_google_last_pull_timestamp_seconds ${lastPullTimestamp}`,
+        '',
+      );
+    }
+
+    lines.push(
       '# HELP vidaemdia_uptime_seconds Tempo de atividade do servidor backend em segundos',
       '# TYPE vidaemdia_uptime_seconds gauge',
       `vidaemdia_uptime_seconds ${Math.floor(process.uptime())}`,
       '',
-    ].join('\n');
+    );
+
+    return lines.join('\n');
   }
 }
-
