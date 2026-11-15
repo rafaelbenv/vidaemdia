@@ -127,6 +127,11 @@ Compromissos criados no VidaEmDia vão para o Google Agenda e vice-versa; os imp
 
 Atenção: em modo de teste no Google, o refresh token expira em 7 dias. Para a apresentação, reconectar antes.
 
+### Bloco 9 — Contas próprias e servidor público (depois do Bloco 8)
+
+Adicionado em 2026-11-15. Roteiro completo em `.plans/68-contas-proprias-e-servidor.md`: cadastro, primeiro uso, minha conta, recuperação de senha pelo Telegram, exclusão de conta (LGPD), isolamento entre contas, termos de uso, HTTPS, segredos de produção, Google e Telegram em produção, backups e deploy pelo CI.
+
+
 ## 2. Dependências que mais importam
 
 Estas são as ordens que não podem ser invertidas, com o motivo:
