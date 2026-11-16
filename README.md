@@ -165,7 +165,7 @@ FRONTEND_URL="http://localhost:8080"
 
 - **Como ligar:** O dono da agenda conecta sua conta Google via OAuth 2.0 (pelo botão na interface ou via rota `GET /google/connect`) e escolhe qual agenda do Google será vinculada a cada agenda do VidaEmDia (`PUT /agendas/:id/google`). Somente o dono da agenda tem permissão para vincular, desvincular ou sincronizar.
 - **VidaEmDia → Google (Envio):** Criar, alterar e cancelar compromissos geram um job na fila (`GoogleSyncJob`). O worker (`GoogleSyncWorker`) executa a cada minuto (`GOOGLE_SYNC_CRON_EXPRESSION`, padrão `*/1 * * * *`). Em caso de falha transitória, tenta novamente com espera crescente de 1, 5, 15 e 30 minutos (`RETRY_DELAYS_MINUTES`), desistindo após 5 tentativas (marcando o status como `FAILED`). Conexão expirada (`invalid_grant`) ou dono sem conta Google conectada falham imediatamente sem novas tentativas.
-- **Google → VidaEmDia (Recebimento):** O serviço de pull (`GooglePullService`) executa a cada minuto (`GOOGLE_PULL_CRON_EXPRESSION`, padrão `*/1 * * * *`). Na primeira execução, busca eventos no intervalo de -24 horas a +60 dias; nas execuções seguintes, realiza sincronização incremental utilizando `syncToken`. Se o Google responder com status 410 (token expirado), o sistema descarta o token e recomeça a carga do zero. O eco das próprias alterações enviadas pelo VidaEmDia é detectado e ignorado comparando o `etag` do evento (`appt.googleEtag === ev.etag`). O dono pode forçar uma rodada de sincronização a qualquer momento pelo botão na interface ou via `POST /agendas/:id/google/sincronizar`.
+- **Google → VidaEmDia (Recebimento):** O serviço de pull (`GooglePullService`) executa a cada minuto (`GOOGLE_PULL_CRON_EXPRESSION`, padrão `*/1 * * * *`). Na primeira execução, busca eventos no intervalo de -24 horas a +60 dias; nas execuções seguintes, realiza sincronização incremental utilizando `syncToken`. Se o Google responder com status 410 (token expirado), o sistema descarta o token e recomeça a carga do zero. O eco das próprias alterações enviadas pelo VidaEmDia é detectado e ignorado comparando o `etag` do evento (`appt.googleEtag === ev.etag`). O dono pode forçar uma rodada de sincronização a qualquer momento pela API, com `POST /agendas/:id/google/sincronizar` (pelo Swagger, por exemplo); na interface, basta aguardar até 1 minuto e recarregar a agenda.
 - **Regras de sincronização:**
   - **Conflito de horário:** Conflitos de horário são sinalizados e não recusados. Eventos vindos do Google nunca são rejeitados; o sistema detecta sobreposições (`ConflictService`), marca `hasConflict: true` e exibe o aviso "Conflito de horário" na interface.
   - **Dia inteiro:** Compromissos de dia inteiro recebem `allDay: true` (sem horário fixo de término) e o lembrete é agendado automaticamente para as 8h da manhã do dia do compromisso.
@@ -365,3 +365,52 @@ No dashboard Grafana (**VidaEmDia — Visão geral**), a linha **Google Agenda**
 - **Sincronizações com o Google por sentido:** gráfico temporal (`timeseries`) com a taxa de sincronizações discriminadas por sentido (`direction`: `envio` ou `recebimento`) e resultado (`result`: `ok` ou `erro`).
 - **Fila de envio (pendentes / com falha):** indicadores instantâneos (`stat`) com a quantidade de jobs na fila por status (`PENDING` e `FAILED`).
 - **Última sincronização recebida:** indicador numérico (`stat`) exibindo o tempo relativo decorrido desde a última sincronização recebida do Google (`dateTimeFromNow`).
+
+---
+
+## 9. Apresentação (checklist e roteiro)
+
+### 9.1 Na véspera
+- Abrir o Docker Desktop e subir tudo: `docker compose up -d --build`.
+- No `.env`: `TELEGRAM_MODE=polling` e `VITE_SHOW_DEMO_ACCOUNTS=true` (depois de mudar, `docker compose up -d --build frontend`).
+- Reconectar o Google se faltarem menos de 2 dias para os 7 dias (o script avisa).
+- Fazer um backup: `docker exec vidaemdia-backup /scripts/backup.sh` (no Git Bash, usar `MSYS_NO_PATHCONV=1` antes do comando ou rodar pelo PowerShell, porque o Git Bash converte o caminho `/scripts/...`).
+- Rodar o checklist: `powershell -ExecutionPolicy Bypass -File infra\apresentacao\checar.ps1`; tudo deve sair `[OK]` ou com avisos entendidos.
+- Não rodar o seed (`prisma:seed`): ele apaga e recria as agendas das contas de demonstração, e o vínculo com o Google se perde.
+
+### 9.2 Endereços
+
+| Serviço | Endereço | Credenciais / Observação |
+| :--- | :--- | :--- |
+| **Aplicação** | `http://localhost:8080` | Interface web principal |
+| **Swagger** | `http://localhost:8080/api/api/docs` | Documentação OpenAPI dos endpoints |
+| **Grafana** | `http://localhost:8080/grafana/` | Usuário e senha do `.env`: `GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD` |
+| **Bot Telegram** | `@<TELEGRAM_BOT_USERNAME>` | Username configurado no `.env` |
+
+### 9.3 Roteiro de demonstração
+
+1. **Criar conta**: em `/criar-conta`, criar uma conta nova; mostrar a regra da senha e o cartão Primeiros passos na agenda.
+2. **Compromisso e lembrete no Telegram**: entrar como Carlos (conta com o Telegram vinculado), criar um compromisso para daqui a poucos minutos com lembrete; mostrar a mensagem chegando no Telegram. Atalho: Bastidores > Envio de lembretes > executar o worker agora.
+3. **Bot**: no Telegram, mandar `/agenda` ou criar um compromisso por mensagem; mostrar que ele aparece na agenda.
+4. **Google Agenda**: na agenda do Carlos (ligada ao Google), criar um compromisso e mostrar no Google Agenda; criar um evento no Google, aguardar até 1 minuto e recarregar a agenda para ele aparecer no VidaEmDia (marca Google); para não esperar, chamar `POST /agendas/:id/google/sincronizar` pelo Swagger. Mostrar também a marca de conflito.
+5. **Compartilhar e RBAC**: entrar como Dr. João e abrir Compartilhar no consultório (a secretária Maria já tem acesso; dá para mostrar tirar e devolver a permissão); entrar como Maria e mostrar o consultório dele; em Bastidores > Controle de acesso, mostrar o `403` ao tentar a agenda da Dra. Ana.
+6. **Histórico e auditoria**: Histórico da agenda e Bastidores > Auditoria.
+7. **Minha conta e Esqueci a senha**: trocar o nome, mostrar a recuperação de senha pelo Telegram (só com conta que tem o Telegram vinculado).
+8. **Monitoramento**: Grafana, painel VidaEmDia — Visão geral (compromissos, lembretes, Telegram, Google, segurança) e os alertas; Bastidores > Envio de lembretes > simular falha para mostrar o contador de falhas.
+9. **DevOps**: CI no GitHub Actions (lint, testes, build, imagens, Trivy, validação do monitoramento), Docker Compose com healthchecks, backup e restauração (seção 7).
+
+### 9.4 Acesso pelo celular (opcional)
+- `cloudflared tunnel --url http://localhost:8080` gera um endereço `https://...trycloudflare.com` temporário, sem conta e sem cartão. Vale enquanto o comando e o computador estiverem ligados.
+- Não é preciso mudar o `CORS_ORIGIN`: o front chama a API no mesmo endereço (`/api`), então pelo túnel as chamadas continuam na mesma origem.
+- O "Conectar Google" não funciona pelo túnel (o Google só aceita o redirecionamento cadastrado); mostrar essa parte no computador.
+
+### 9.5 Problemas comuns
+
+| Problema | O que fazer |
+| :--- | :--- |
+| Botões das contas demo não aparecem | `VITE_SHOW_DEMO_ACCOUNTS=true` e rebuild do front (`docker compose up -d --build frontend`). |
+| "Conexão com o Google expirou" | Menu do usuário > Google Agenda > desconectar e conectar de novo. |
+| Avisos `Erro no polling do Telegram: fetch failed` no log | Instabilidade da internet; o bot tenta de novo sozinho. Se o bot não responder, `docker compose restart backend`. |
+| Lembrete não chegou | Conferir se a conta tem o Telegram vinculado e usar "executar o worker agora". |
+| Alerta `BackendReiniciado` no Grafana logo após subir | Esperado nos primeiros 2 minutos. |
+| Porta 8080 ocupada | Fechar o outro programa ou mudar a porta no `docker-compose.yml`. |

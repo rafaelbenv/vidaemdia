@@ -31,6 +31,65 @@ export function maskTelegramToken(text: string): string {
   return result.replace(/\/bot[^/?#\s]+/gi, '/bot***');
 }
 
+const NETWORK_ERROR_CODES = new Set([
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'EPIPE',
+  'ECONNREFUSED',
+  'EAI_AGAIN',
+  'ENOTFOUND',
+  'UND_ERR_SOCKET',
+  'UND_ERR_CONNECT_TIMEOUT',
+  'UND_ERR_HEADERS_TIMEOUT',
+  'UND_ERR_BODY_TIMEOUT',
+]);
+
+export function describeFetchError(err: any): string {
+  if (!err) return '';
+  const message = err?.message || String(err);
+  const causeCode = err?.cause?.code;
+  const causeMessage = err?.cause?.message;
+
+  let causeDetails = '';
+  if (causeCode && causeMessage) {
+    causeDetails = `${causeCode}: ${causeMessage}`;
+  } else if (causeCode) {
+    causeDetails = String(causeCode);
+  } else if (causeMessage) {
+    causeDetails = String(causeMessage);
+  } else if (typeof err?.cause === 'string' && err.cause.trim()) {
+    causeDetails = err.cause.trim();
+  }
+
+  const full = causeDetails ? `${message} (${causeDetails})` : message;
+  return maskTelegramToken(full);
+}
+
+export function isNetworkError(err: any): boolean {
+  if (!err) return false;
+  if (
+    (err instanceof TypeError || err?.name === 'TypeError') &&
+    err?.message === 'fetch failed'
+  ) {
+    return true;
+  }
+  const causeCode = err?.cause?.code;
+  if (causeCode && NETWORK_ERROR_CODES.has(causeCode)) {
+    return true;
+  }
+  const code = err?.code;
+  if (code && NETWORK_ERROR_CODES.has(code)) {
+    return true;
+  }
+  return false;
+}
+
+export interface PollingErrorDecision {
+  delayMs: number;
+  countMetric: boolean;
+  level: 'warn' | 'error';
+}
+
 @Injectable()
 export class TelegramService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TelegramService.name);
@@ -38,6 +97,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   private isPolling = false;
   private abortController: AbortController | null = null;
   private lastUpdateId = 0;
+  consecutiveNetworkFailures = 0;
 
   constructor(
     @Optional() private readonly metricsService?: MetricsService,
@@ -229,6 +289,41 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  resetPollingFailures(): void {
+    this.consecutiveNetworkFailures = 0;
+  }
+
+  handlePollingError(err: any): PollingErrorDecision {
+    if (isNetworkError(err)) {
+      this.consecutiveNetworkFailures++;
+      if (this.consecutiveNetworkFailures === 1) {
+        return {
+          level: 'warn',
+          countMetric: false,
+          delayMs: 1000,
+        };
+      }
+      const delays: Record<number, number> = {
+        2: 5000,
+        3: 10000,
+        4: 20000,
+      };
+      const delayMs = delays[this.consecutiveNetworkFailures] ?? 30000;
+      return {
+        level: 'error',
+        countMetric: true,
+        delayMs,
+      };
+    }
+
+    this.consecutiveNetworkFailures = 0;
+    return {
+      level: 'error',
+      countMetric: true,
+      delayMs: 5000,
+    };
+  }
+
   private startPollingLoop(): void {
     this.isPolling = true;
     this.abortController = new AbortController();
@@ -269,6 +364,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
           };
 
           if (data.ok && Array.isArray(data.result)) {
+            this.resetPollingFailures();
             for (const update of data.result) {
               if (!this.isPolling) break;
               if (typeof update.update_id === 'number') {
@@ -283,11 +379,19 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
           if (!this.isPolling || err?.name === 'AbortError') {
             break;
           }
-          this.metricsService?.incrementTelegramApiError();
-          this.logger.error(
-            `Erro no polling do Telegram: ${maskTelegramToken(err?.message || String(err))}`,
-          );
-          await this.sleep(5000);
+          const decision = this.handlePollingError(err);
+          const desc = describeFetchError(err);
+          if (decision.level === 'warn') {
+            this.logger.warn(
+              `Conexão do polling do Telegram caiu (${desc}); tentando de novo em 1 s.`,
+            );
+          } else {
+            this.logger.error(`Erro no polling do Telegram: ${desc}`);
+          }
+          if (decision.countMetric) {
+            this.metricsService?.incrementTelegramApiError();
+          }
+          await this.sleep(decision.delayMs);
         }
       }
     })();
