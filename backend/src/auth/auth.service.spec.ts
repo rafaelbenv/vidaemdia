@@ -299,6 +299,116 @@ describe('AuthService', () => {
     });
   });
 
+  describe('updateDailySummary', () => {
+    it('grava os dois campos, registra auditoria "Resumo diário ligado às 07:00." e devolve o perfil', async () => {
+      const updatedUser = {
+        id: 'u1',
+        name: 'Carlos Silva',
+        email: 'carlos@vidaemdia.com.br',
+        role: UserRole.USER,
+        telegramChatId: null,
+        preferredChannel: 'TELEGRAM',
+        dailySummaryEnabled: true,
+        dailySummaryHour: 7,
+        createdAt: new Date(),
+      };
+
+      mockPrisma.user.update.mockResolvedValue(updatedUser);
+      mockPrisma.user.findUnique.mockResolvedValue(updatedUser);
+
+      const result = await authService.updateDailySummary(
+        'u1',
+        { enabled: true, hour: 7 },
+        '127.0.0.1',
+      );
+
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'u1' },
+        data: {
+          dailySummaryEnabled: true,
+          dailySummaryHour: 7,
+        },
+      });
+
+      expect(mockAuditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actorUserId: 'u1',
+          entityType: 'AUTH',
+          entityId: 'u1',
+          action: 'UPDATE',
+          details: 'Resumo diário ligado às 07:00.',
+          ipAddress: '127.0.0.1',
+        }),
+      );
+
+      expect(result).toEqual({
+        id: 'u1',
+        name: 'Carlos Silva',
+        email: 'carlos@vidaemdia.com.br',
+        role: UserRole.USER,
+        preferredChannel: 'TELEGRAM',
+        dailySummaryEnabled: true,
+        dailySummaryHour: 7,
+        createdAt: expect.any(Date),
+        telegramLinked: false,
+      });
+    });
+
+    it('registra auditoria "Resumo diário desligado." quando enabled for false', async () => {
+      const updatedUser = {
+        id: 'u1',
+        name: 'Carlos Silva',
+        email: 'carlos@vidaemdia.com.br',
+        role: UserRole.USER,
+        telegramChatId: null,
+        preferredChannel: 'TELEGRAM',
+        dailySummaryEnabled: false,
+        dailySummaryHour: 8,
+        createdAt: new Date(),
+      };
+
+      mockPrisma.user.update.mockResolvedValue(updatedUser);
+      mockPrisma.user.findUnique.mockResolvedValue(updatedUser);
+
+      const result = await authService.updateDailySummary(
+        'u1',
+        { enabled: false, hour: 8 },
+        '127.0.0.1',
+      );
+
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'u1' },
+        data: {
+          dailySummaryEnabled: false,
+          dailySummaryHour: 8,
+        },
+      });
+
+      expect(mockAuditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actorUserId: 'u1',
+          entityType: 'AUTH',
+          entityId: 'u1',
+          action: 'UPDATE',
+          details: 'Resumo diário desligado.',
+          ipAddress: '127.0.0.1',
+        }),
+      );
+
+      expect(result).toEqual({
+        id: 'u1',
+        name: 'Carlos Silva',
+        email: 'carlos@vidaemdia.com.br',
+        role: UserRole.USER,
+        preferredChannel: 'TELEGRAM',
+        dailySummaryEnabled: false,
+        dailySummaryHour: 8,
+        createdAt: expect.any(Date),
+        telegramLinked: false,
+      });
+    });
+  });
+
   describe('changePassword', () => {
     it('deve lançar NotFoundException quando o usuário não existir', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);

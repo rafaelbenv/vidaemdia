@@ -2,13 +2,17 @@ import { applyDecorators } from '@nestjs/common';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+  IsBoolean,
   IsEmail,
   IsEnum,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 import { NotificationChannel } from '@prisma/client';
@@ -114,5 +118,18 @@ export class DeleteAccountDto {
   @IsNotEmpty({ message: 'Informe a sua senha para confirmar' })
   password: string;
 }
+
+export class UpdateDailySummaryDto {
+  @ApiProperty({ example: true })
+  @IsBoolean({ message: 'Informe se o resumo diário fica ligado' })
+  enabled: boolean;
+
+  @ApiProperty({ example: 7 })
+  @IsInt({ message: 'A hora deve ser um número inteiro' })
+  @Min(0, { message: 'A hora deve estar entre 0 e 23' })
+  @Max(23, { message: 'A hora deve estar entre 0 e 23' })
+  hour: number;
+}
+
 
 

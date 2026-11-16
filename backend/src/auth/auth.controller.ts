@@ -21,6 +21,7 @@ import {
   LoginDto,
   RegisterDto,
   ResetPasswordDto,
+  UpdateDailySummaryDto,
   UpdateProfileDto,
 } from './dto/auth.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -64,6 +65,14 @@ export class AuthController {
   @ApiOperation({ summary: 'Altera o nome do usuário autenticado' })
   async updateProfile(@Body() dto: UpdateProfileDto, @Req() req: any) {
     return this.authService.updateProfile(req.user.sub, dto, req.ip);
+  }
+
+  @Patch('me/resumo-diario')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Liga/desliga o resumo diário no Telegram e define a hora' })
+  async updateDailySummary(@Body() dto: UpdateDailySummaryDto, @Req() req: any) {
+    return this.authService.updateDailySummary(req.user.sub, dto, req.ip);
   }
 
   @Post('me/senha')

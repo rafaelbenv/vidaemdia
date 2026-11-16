@@ -13,6 +13,7 @@ import {
   ChangePasswordDto,
   LoginDto,
   RegisterDto,
+  UpdateDailySummaryDto,
   UpdateProfileDto,
 } from './dto/auth.dto';
 import { MetricsService } from '../monitoring/metrics.service';
@@ -129,6 +130,8 @@ export class AuthService {
         role: true,
         telegramChatId: true,
         preferredChannel: true,
+        dailySummaryEnabled: true,
+        dailySummaryHour: true,
         createdAt: true,
       },
     });
@@ -157,6 +160,36 @@ export class AuthService {
       entityId: userId,
       action: 'UPDATE',
       details: `Nome alterado para ${name}.`,
+      ipAddress,
+    });
+
+    return this.getProfile(userId);
+  }
+
+  async updateDailySummary(
+    userId: string,
+    dto: UpdateDailySummaryDto,
+    ipAddress?: string,
+  ) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        dailySummaryEnabled: dto.enabled,
+        dailySummaryHour: dto.hour,
+      },
+    });
+
+    const hh = String(dto.hour).padStart(2, '0');
+    const details = dto.enabled
+      ? `Resumo diário ligado às ${hh}:00.`
+      : 'Resumo diário desligado.';
+
+    await this.auditService.log({
+      actorUserId: userId,
+      entityType: 'AUTH',
+      entityId: userId,
+      action: 'UPDATE',
+      details,
       ipAddress,
     });
 

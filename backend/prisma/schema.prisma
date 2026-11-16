@@ -45,6 +45,9 @@ model User {
   telegramChatId   String?             @unique @map("telegram_chat_id")
   role             UserRole            @default(USER)
   preferredChannel NotificationChannel @default(TELEGRAM) @map("preferred_channel")
+  dailySummaryEnabled    Boolean  @default(true) @map("daily_summary_enabled")
+  dailySummaryHour       Int      @default(7) @map("daily_summary_hour")
+  dailySummaryLastSentOn String?  @map("daily_summary_last_sent_on") // 'AAAA-MM-DD' (São Paulo)
   createdAt        DateTime            @default(now()) @map("created_at")
   updatedAt        DateTime            @updatedAt @map("updated_at")
 

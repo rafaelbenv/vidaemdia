@@ -150,4 +150,61 @@ describe('Minha Conta', () => {
     expect(deleteCalls).toHaveLength(1);
     expect(deleteCalls[0].body).toEqual({ password: '123456' });
   });
+
+  it('seção Resumo diário mostra título, checkbox marcado, horário 7 e botão desabilitado', async () => {
+    renderApp({ path: '/conta', token: 'token-carlos' });
+
+    expect(await screen.findByRole('heading', { name: /^resumo diário$/i, level: 2 })).toBeInTheDocument();
+    const checkbox = screen.getByLabelText(/^receber o resumo diário$/i);
+    expect(checkbox).toBeChecked();
+
+    const select = screen.getByLabelText(/^horário$/i);
+    expect(select).toHaveValue('7');
+
+    const saveBtn = screen.getByRole('button', { name: /^salvar resumo$/i });
+    expect(saveBtn).toBeDisabled();
+  });
+
+  it('ao mudar o horário para 08:00 e salvar, envia PATCH /auth/me/resumo-diario com { enabled: true, hour: 8 } e mostra "Resumo diário salvo."', async () => {
+    const { user } = renderApp({ path: '/conta', token: 'token-carlos' });
+
+    const select = await screen.findByLabelText(/^horário$/i);
+    await user.selectOptions(select, '08:00');
+
+    const saveBtn = screen.getByRole('button', { name: /^salvar resumo$/i });
+    expect(saveBtn).toBeEnabled();
+    await user.click(saveBtn);
+
+    expect(await screen.findByText('Resumo diário salvo.')).toBeInTheDocument();
+    const patchCalls = calls().filter(
+      (c) => c.method === 'PATCH' && c.path.includes('/auth/me/resumo-diario'),
+    );
+    expect(patchCalls).toHaveLength(1);
+    expect(patchCalls[0].body).toEqual({ enabled: true, hour: 8 });
+  });
+
+  it('ao desmarcar o checkbox, desabilita o select e envia { enabled: false, hour: 7 } ao salvar', async () => {
+    const { user } = renderApp({ path: '/conta', token: 'token-carlos' });
+
+    const checkbox = await screen.findByLabelText(/^receber o resumo diário$/i);
+    const select = screen.getByLabelText(/^horário$/i);
+
+    expect(checkbox).toBeChecked();
+    expect(select).toBeEnabled();
+
+    await user.click(checkbox);
+    expect(checkbox).not.toBeChecked();
+    expect(select).toBeDisabled();
+
+    const saveBtn = screen.getByRole('button', { name: /^salvar resumo$/i });
+    expect(saveBtn).toBeEnabled();
+    await user.click(saveBtn);
+
+    expect(await screen.findByText('Resumo diário salvo.')).toBeInTheDocument();
+    const patchCalls = calls().filter(
+      (c) => c.method === 'PATCH' && c.path.includes('/auth/me/resumo-diario'),
+    );
+    expect(patchCalls).toHaveLength(1);
+    expect(patchCalls[0].body).toEqual({ enabled: false, hour: 7 });
+  });
 });

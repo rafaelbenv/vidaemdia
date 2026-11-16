@@ -16,6 +16,8 @@ export const USER_CARLOS: User = {
   telegramChatId: '123456789',
   telegramLinked: true,
   preferredChannel: 'TELEGRAM',
+  dailySummaryEnabled: true,
+  dailySummaryHour: 7,
 };
 
 export const USER_DR_JOAO: User = {
@@ -26,6 +28,8 @@ export const USER_DR_JOAO: User = {
   telegramChatId: undefined,
   telegramLinked: false,
   preferredChannel: 'TELEGRAM',
+  dailySummaryEnabled: true,
+  dailySummaryHour: 7,
 };
 
 export const USER_MARIA: User = {
@@ -36,6 +40,8 @@ export const USER_MARIA: User = {
   telegramChatId: undefined,
   telegramLinked: false,
   preferredChannel: 'TELEGRAM',
+  dailySummaryEnabled: true,
+  dailySummaryHour: 7,
 };
 
 export const CALENDAR_CARLOS_PESSOAL: Calendar = {
@@ -231,6 +237,8 @@ export function installMockApi(seed?: MockApiSeed) {
   recordedCalls = [];
   userPasswords = {};
   nextId = 100;
+  USER_CARLOS.dailySummaryEnabled = true;
+  USER_CARLOS.dailySummaryHour = 7;
   currentUsers = seed?.users ? [...seed.users] : [USER_CARLOS, USER_DR_JOAO, USER_MARIA];
   currentCalendars = seed?.calendars
     ? [...seed.calendars]
@@ -381,6 +389,17 @@ export function installMockApi(seed?: MockApiSeed) {
     if (route === '/auth/me' && method === 'PATCH') {
       if (body?.name !== undefined) {
         currentUser.name = String(body.name).trim();
+      }
+      return jsonResponse(currentUser);
+    }
+
+    // PATCH /auth/me/resumo-diario
+    if (route === '/auth/me/resumo-diario' && method === 'PATCH') {
+      if (body?.enabled !== undefined) {
+        currentUser.dailySummaryEnabled = Boolean(body.enabled);
+      }
+      if (body?.hour !== undefined) {
+        currentUser.dailySummaryHour = Number(body.hour);
       }
       return jsonResponse(currentUser);
     }

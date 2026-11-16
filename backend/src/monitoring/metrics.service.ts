@@ -13,6 +13,8 @@ export class MetricsService {
     appointmentsCreatedTelegram: 0,
     remindersSentTelegram: 0,
     remindersFailed: 0,
+    dailySummariesSent: 0,
+    dailySummariesFailed: 0,
     rbacAccessDenied: 0,
     authFailures: 0,
     telegramUpdatesReceived: 0,
@@ -34,6 +36,14 @@ export class MetricsService {
 
   incrementReminderFailed(_channel: string) {
     this.counters.remindersFailed++;
+  }
+
+  incrementDailySummarySent() {
+    this.counters.dailySummariesSent++;
+  }
+
+  incrementDailySummaryFailed() {
+    this.counters.dailySummariesFailed++;
   }
 
   incrementRbacDenied() {
@@ -83,6 +93,14 @@ export class MetricsService {
       '# HELP vidaemdia_reminders_failed_total Total de falhas/retries no envio de lembretes',
       '# TYPE vidaemdia_reminders_failed_total counter',
       `vidaemdia_reminders_failed_total ${this.counters.remindersFailed}`,
+      '',
+      '# HELP vidaemdia_daily_summaries_sent_total Total de resumos diários enviados pelo Telegram',
+      '# TYPE vidaemdia_daily_summaries_sent_total counter',
+      `vidaemdia_daily_summaries_sent_total ${this.counters.dailySummariesSent}`,
+      '',
+      '# HELP vidaemdia_daily_summaries_failed_total Total de falhas ao enviar o resumo diário',
+      '# TYPE vidaemdia_daily_summaries_failed_total counter',
+      `vidaemdia_daily_summaries_failed_total ${this.counters.dailySummariesFailed}`,
       '',
       '# HELP vidaemdia_telegram_updates_received_total Total de updates recebidos da Telegram Bot API',
       '# TYPE vidaemdia_telegram_updates_received_total counter',

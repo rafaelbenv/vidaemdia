@@ -27,6 +27,7 @@ O projeto segue fielmente o diagrama arquitetural `VidaEmDia_Fluxo.drawio.html`:
    * Monta a mensagem padronizada (*"🔔 <b>Lembrete VidaEmDia</b>: Consulta médica hoje às 08:00."*) e envia para a **Telegram Bot API**.
    * **Envio bem-sucedido:** Atualiza o status do lembrete para `SENT` (`ENVIADO`) no PostgreSQL.
    * **Falha no envio:** Registra o erro e agenda nova tentativa com *backoff* (**máx. 3 tentativas**).
+   * **Resumo diário** (`DailySummaryWorker`, a cada 5 minutos): na hora escolhida pelo usuário (padrão 07:00, ligado por padrão), envia pelo Telegram os compromissos do dia, ou "Dia livre" quando não há nenhum. Vai uma vez por dia por usuário, mesmo com várias instâncias: o dia do envio é reservado no banco antes de mandar. Se falhar, a reserva é desfeita e há nova tentativa no próximo ciclo da mesma hora. Liga, desliga e muda a hora em **Minha conta** (`PATCH /auth/me/resumo-diario`).
 
 4. **Chatbot Bidirecional via Telegram (`/telegram/webhook` ou Polling):**
    * Processa mensagens do usuário via Telegram (ex.: `"/agenda"` ou `"Marcar Consulta médica amanhã às 08:00"`).
@@ -123,6 +124,7 @@ Para receber os updates via webhook em produção ou com ferramenta de túnel:
 4. Ao clicar no link, o Telegram abre a conversa com o bot exibindo o botão **Iniciar** (ou enviando `/start <codigo>`).
 5. O bot consome o código de forma atômica no banco, armazena o `telegramChatId` associado ao usuário, emite log de auditoria e responde confirmando o vínculo.
 6. A partir desse momento, lembretes de compromissos são enviados para este Telegram e o usuário pode consultar sua agenda com `/agenda` ou criar novos compromissos em linguagem natural.
+7. Todo dia, na hora escolhida em **Minha conta** (padrão 07:00), o bot também manda o resumo dos compromissos do dia, sem o usuário pedir.
 
 ---
 
@@ -352,6 +354,8 @@ A stack de monitoramento é composta pelo **Prometheus** (coleta de métricas e 
 | `vidaemdia_appointments_created_total` | Counter | `source="WEB" \| "TELEGRAM"` | Total de compromissos criados por canal |
 | `vidaemdia_reminders_sent_total` | Counter | `channel="TELEGRAM"` | Total de lembretes enviados com sucesso pelo Worker |
 | `vidaemdia_reminders_failed_total` | Counter | *(nenhum)* | Total de falhas/retries no envio de lembretes |
+| `vidaemdia_daily_summaries_sent_total` | Counter | *(nenhum)* | Total de resumos diários enviados pelo Telegram |
+| `vidaemdia_daily_summaries_failed_total` | Counter | *(nenhum)* | Total de falhas ao enviar o resumo diário |
 | `vidaemdia_telegram_updates_received_total` | Counter | *(nenhum)* | Total de updates recebidos da Telegram Bot API |
 | `vidaemdia_telegram_api_errors_total` | Counter | *(nenhum)* | Total de erros na API do Telegram |
 | `vidaemdia_rbac_access_denied_total` | Counter | *(nenhum)* | Total de bloqueios 403 RBAC (tentativa de acesso não autorizado) |
@@ -392,6 +396,7 @@ No dashboard Grafana (**VidaEmDia — Visão geral**), a linha **Google Agenda**
 1. **Criar conta**: em `/criar-conta`, criar uma conta nova; mostrar a regra da senha e o cartão Primeiros passos na agenda.
 2. **Compromisso e lembrete no Telegram**: entrar como Carlos (conta com o Telegram vinculado), criar um compromisso para daqui a poucos minutos com lembrete; mostrar a mensagem chegando no Telegram. Atalho: Bastidores > Envio de lembretes > executar o worker agora.
 3. **Bot**: no Telegram, mandar `/agenda` ou criar um compromisso por mensagem; mostrar que ele aparece na agenda.
+   **Resumo diário**: em Minha conta, na seção Resumo diário, escolher a hora atual e salvar; em até 5 minutos o resumo do dia chega no Telegram. Ele vai só uma vez por dia, então, se já tiver chegado hoje, não chega de novo. Para repetir no ensaio: `docker exec vidaemdia-postgres psql -U vidaemdia -d vidaemdia_db -c "UPDATE users SET daily_summary_last_sent_on = NULL;"`.
 4. **Google Agenda**: na agenda do Carlos (ligada ao Google), criar um compromisso e mostrar no Google Agenda; criar um evento no Google, aguardar até 1 minuto e recarregar a agenda para ele aparecer no VidaEmDia (marca Google); para não esperar, chamar `POST /agendas/:id/google/sincronizar` pelo Swagger. Mostrar também a marca de conflito.
 5. **Compartilhar e RBAC**: entrar como Dr. João e abrir Compartilhar no consultório (a secretária Maria já tem acesso; dá para mostrar tirar e devolver a permissão); entrar como Maria e mostrar o consultório dele; em Bastidores > Controle de acesso, mostrar o `403` ao tentar a agenda da Dra. Ana.
 6. **Histórico e auditoria**: Histórico da agenda e Bastidores > Auditoria.

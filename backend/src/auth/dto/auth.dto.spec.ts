@@ -1,7 +1,12 @@
 import { ValidationPipe } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { ChangePasswordDto, RegisterDto, UpdateProfileDto } from './auth.dto';
+import {
+  ChangePasswordDto,
+  RegisterDto,
+  UpdateDailySummaryDto,
+  UpdateProfileDto,
+} from './auth.dto';
 
 describe('RegisterDto', () => {
   const pipe = new ValidationPipe({
@@ -152,6 +157,34 @@ describe('ChangePasswordDto', () => {
       currentPassword: '123456',
       newPassword: 'senhaForte1',
     });
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
+  });
+});
+
+describe('UpdateDailySummaryDto', () => {
+  it('recusa hour 24, -1 e 7.5', async () => {
+    const dto24 = plainToInstance(UpdateDailySummaryDto, { enabled: true, hour: 24 });
+    const errors24 = await validate(dto24);
+    expect(errors24.some((e) => e.property === 'hour')).toBe(true);
+
+    const dtoNeg = plainToInstance(UpdateDailySummaryDto, { enabled: true, hour: -1 });
+    const errorsNeg = await validate(dtoNeg);
+    expect(errorsNeg.some((e) => e.property === 'hour')).toBe(true);
+
+    const dtoFloat = plainToInstance(UpdateDailySummaryDto, { enabled: true, hour: 7.5 });
+    const errorsFloat = await validate(dtoFloat);
+    expect(errorsFloat.some((e) => e.property === 'hour')).toBe(true);
+  });
+
+  it('recusa enabled como string "sim"', async () => {
+    const dto = plainToInstance(UpdateDailySummaryDto, { enabled: 'sim', hour: 7 });
+    const errors = await validate(dto);
+    expect(errors.some((e) => e.property === 'enabled')).toBe(true);
+  });
+
+  it('aceita { enabled: false, hour: 0 }', async () => {
+    const dto = plainToInstance(UpdateDailySummaryDto, { enabled: false, hour: 0 });
     const errors = await validate(dto);
     expect(errors).toHaveLength(0);
   });

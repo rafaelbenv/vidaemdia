@@ -12,6 +12,8 @@ export interface User {
   telegramChatId?: string;
   telegramLinked?: boolean;
   preferredChannel: NotificationChannel;
+  dailySummaryEnabled?: boolean;
+  dailySummaryHour?: number;
 }
 
 export interface TelegramStatus {

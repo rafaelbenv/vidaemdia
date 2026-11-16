@@ -309,6 +309,18 @@ export async function updateProfile(token: string, name: string): Promise<User> 
   );
 }
 
+export async function updateDailySummary(
+  token: string,
+  enabled: boolean,
+  hour: number,
+): Promise<User> {
+  return apiRequest<User>(
+    '/auth/me/resumo-diario',
+    { method: 'PATCH', body: JSON.stringify({ enabled, hour }) },
+    token,
+  );
+}
+
 export async function changePassword(
   token: string,
   currentPassword: string,

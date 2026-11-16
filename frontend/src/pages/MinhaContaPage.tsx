@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 import { GoogleStatus, User } from '../types';
-import { changePassword, deleteAccount, errorMessage, updateProfile } from '../api';
+import { changePassword, deleteAccount, errorMessage, updateDailySummary, updateProfile } from '../api';
 
 export interface MinhaContaPageProps {
   user: User;
@@ -51,6 +51,18 @@ export function MinhaContaPage({
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  // Estado Resumo Diário
+  const [summaryEnabled, setSummaryEnabled] = useState(user.dailySummaryEnabled ?? true);
+  const [summaryHour, setSummaryHour] = useState(user.dailySummaryHour ?? 7);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [summarySuccess, setSummarySuccess] = useState(false);
+
+  useEffect(() => {
+    setSummaryEnabled(user.dailySummaryEnabled ?? true);
+    setSummaryHour(user.dailySummaryHour ?? 7);
+  }, [user.dailySummaryEnabled, user.dailySummaryHour]);
 
   // Estado Excluir Conta
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -112,6 +124,23 @@ export function MinhaContaPage({
       setPasswordError(errorMessage(err, 'Não foi possível alterar a senha.'));
     } finally {
       setPasswordLoading(false);
+    }
+  }
+
+  async function handleSaveSummary(e: React.FormEvent) {
+    e.preventDefault();
+    setSummaryError(null);
+    setSummarySuccess(false);
+
+    try {
+      setSummaryLoading(true);
+      const updated = await updateDailySummary(token, summaryEnabled, summaryHour);
+      onUserUpdated(updated);
+      setSummarySuccess(true);
+    } catch (err: unknown) {
+      setSummaryError(errorMessage(err, 'Não foi possível salvar o resumo diário.'));
+    } finally {
+      setSummaryLoading(false);
     }
   }
 
@@ -389,6 +418,105 @@ export function MinhaContaPage({
             </div>
           )}
         </div>
+      </section>
+
+      {/* Card: Resumo diário */}
+      <section className="bg-white rounded-lg border border-stone-200 p-5">
+        <h2 className="text-lg font-semibold text-stone-900 mb-4">Resumo diário</h2>
+        <p className="text-sm text-stone-600 mb-4">
+          Todo dia, no horário escolhido, o bot manda pelo Telegram os seus compromissos do dia.
+        </p>
+        {!telegramLinked && (
+          <p className="text-xs text-amber-700 mb-4">
+            Conecte o Telegram em Conexões para receber o resumo.
+          </p>
+        )}
+        <form onSubmit={handleSaveSummary} noValidate className="space-y-4">
+          {summaryError && (
+            <div
+              role="alert"
+              className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2 flex items-center gap-2"
+            >
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>{summaryError}</span>
+            </div>
+          )}
+
+          {summarySuccess && (
+            <div
+              role="status"
+              className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2 flex items-center gap-2"
+            >
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+              <span>Resumo diário salvo.</span>
+            </div>
+          )}
+
+          <div>
+            <label
+              htmlFor="conta-resumo-ligado"
+              className="inline-flex items-center gap-2 text-sm text-stone-800"
+            >
+              <input
+                id="conta-resumo-ligado"
+                type="checkbox"
+                checked={summaryEnabled}
+                onChange={(e) => {
+                  setSummaryEnabled(e.target.checked);
+                  if (summarySuccess) setSummarySuccess(false);
+                }}
+                className="w-4 h-4 accent-brand-700"
+              />
+              Receber o resumo diário
+            </label>
+          </div>
+
+          <div>
+            <label
+              htmlFor="conta-resumo-hora"
+              className="block text-sm font-medium text-stone-700 mb-1"
+            >
+              Horário
+            </label>
+            <select
+              id="conta-resumo-hora"
+              value={summaryHour}
+              disabled={!summaryEnabled}
+              onChange={(e) => {
+                setSummaryHour(Number(e.target.value));
+                if (summarySuccess) setSummarySuccess(false);
+              }}
+              className="w-32 px-3.5 py-2 text-base border border-stone-300 rounded-md focus:ring-2 focus:ring-brand-700 focus:outline-none"
+            >
+              {Array.from({ length: 24 }, (_, i) => (
+                <option key={i} value={i}>
+                  {String(i).padStart(2, '0')}:00
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <button
+              type="submit"
+              disabled={
+                (summaryEnabled === (user.dailySummaryEnabled ?? true) &&
+                  summaryHour === (user.dailySummaryHour ?? 7)) ||
+                summaryLoading
+              }
+              className="py-2 px-4 bg-brand-700 hover:bg-brand-800 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold text-sm rounded-md transition inline-flex items-center justify-center gap-2"
+            >
+              {summaryLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Salvando…</span>
+                </>
+              ) : (
+                <span>Salvar resumo</span>
+              )}
+            </button>
+          </div>
+        </form>
       </section>
 
       {/* Card 4: Excluir conta */}
